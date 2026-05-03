@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>臨床預測分析系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans p-6">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+        <h1 class="text-3xl font-bold text-indigo-900 pb-2">臨床路徑模擬與預測系統</h1>
+
+        <!-- 頁籤導覽列 -->
+        <div class="flex border-b border-slate-300">
+            <button id="tabBtn1" class="py-2 px-6 text-sm font-bold border-b-2 border-indigo-600 text-indigo-600 transition-colors">1. 系統概觀與訓練</button>
+            <button id="tabBtn2" class="py-2 px-6 text-sm font-bold border-b-2 border-transparent text-slate-400 cursor-not-allowed transition-colors" disabled>2. 🔒 個案探索儀表板</button>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 分頁 1: 系統概觀與訓練 -->
+        <!-- ========================================== -->
+        <div id="tab1" class="grid grid-cols-1 lg:grid-cols-4 gap-6 block">
+            <div class="lg:col-span-1 space-y-6">
+                <!-- 步驟一 -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h2 class="text-lg font-bold text-slate-700 flex items-center gap-2"><span class="bg-indigo-100 text-indigo-700 px-2 rounded">1</span> 資料生成參數</h2>
+                    <div class="mt-4 space-y-3">
+                        <div><label class="block text-sm font-medium text-slate-600">病患總數</label><input type="number" id="n_clients" value="100" class="mt-1 w-full rounded-md border p-2 focus:ring-indigo-500"></div>
+                        <div><label class="block text-sm font-medium text-slate-600">模擬天數</label><input type="number" id="sim_days" value="3000" class="mt-1 w-full rounded-md border p-2"></div>
+                        <div><label class="block text-sm font-medium text-slate-600">序列長度</label><input type="number" id="seq_len" value="5" class="mt-1 w-full rounded-md border p-2"></div>
+                        <button id="btnGenerate" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg hover:bg-indigo-700 transition mt-2">生成資料</button>
+                        <div id="loadingData" class="hidden text-sm text-indigo-600 text-center font-medium animate-pulse mt-2">⏳ 正在生成資料...</div>
+                    </div>
+                </div>
+
+                <!-- 步驟二 -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 relative">
+                    <div id="modelOverlay" class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-xl"><span class="text-sm font-bold text-slate-500 bg-white px-3 py-1 rounded-full border shadow-sm">請先完成步驟一</span></div>
+                    <h2 class="text-lg font-bold text-slate-700 flex items-center gap-2"><span class="bg-emerald-100 text-emerald-700 px-2 rounded">2</span> 模型參數 (LSTM)</h2>
+                    <div class="mt-4 space-y-3">
+                        <div><label class="block text-sm font-medium text-slate-600">訓練輪數 (Epochs)</label><input type="number" id="epochs" value="5" class="mt-1 w-full rounded-md border p-2 focus:ring-emerald-500"></div>
+                        <div><label class="block text-sm font-medium text-slate-600">學習率 (LR)</label><input type="number" step="0.001" id="lr" value="0.005" class="mt-1 w-full rounded-md border p-2"></div>
+                        <button id="btnTrain" class="w-full bg-emerald-600 text-white font-bold py-2 rounded-lg hover:bg-emerald-700 transition mt-2">啟動模型訓練</button>
+                        <div id="loadingModel" class="hidden text-sm text-emerald-600 text-center font-medium animate-pulse mt-2">🧠 正在訓練模型...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 全局圖表 -->
+            <div class="lg:col-span-3 space-y-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h2 class="text-xl font-bold text-slate-800 border-b pb-3 mb-4">📊 階段一：臨床路徑資料分佈</h2>
+                    <div id="dataPlotContainer" class="bg-slate-50 border border-dashed border-slate-300 min-h-[300px] flex items-center justify-center rounded-lg text-slate-400 overflow-hidden relative">等待生成資料...</div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h2 class="text-xl font-bold text-slate-800 border-b pb-3 mb-4 flex justify-between items-center">
+                        <span>🎯 階段二：全局模型預估結果</span>
+                        <span id="metricsContainer" class="text-sm text-slate-500 bg-slate-100 px-3 py-1 rounded-full border transition-all">尚未訓練</span>
+                    </h2>
+                    <div id="resultPlotContainer" class="bg-slate-50 border border-dashed border-slate-300 min-h-[300px] flex items-center justify-center rounded-lg text-slate-400 overflow-hidden relative">等待訓練完成後顯示...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 分頁 2: 個案探索儀表板 -->
+        <!-- ========================================== -->
+        <div id="tab2" class="hidden space-y-6">
+            
+            <!-- 頂部控制列 -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div><h2 class="text-2xl font-bold text-indigo-900" id="patientInfo">載入病患中...</h2></div>
+                
+                <div class="flex items-center gap-3">
+                    <span class="text-sm font-medium text-slate-500">測試集病患：</span>
+                    <!-- 既有測試集選單 -->
+                    <div class="flex items-center gap-2 bg-slate-100 p-1 rounded-lg border border-slate-200 shadow-sm">
+                        <button id="btnPrev" class="px-3 py-1.5 bg-white text-slate-700 rounded hover:bg-slate-50 text-sm font-medium transition">⬅️ 上一位</button>
+                        <select id="uidSelect" class="w-24 text-center border-none bg-transparent font-bold text-indigo-700 focus:ring-0 cursor-pointer"></select>
+                        <button id="btnNext" class="px-3 py-1.5 bg-white text-slate-700 rounded hover:bg-slate-50 text-sm font-medium transition">下一位 ➡️</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ECharts: 歷史全貌 -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-800 mb-2">👁️ 上帝視角與模型視窗</h3>
+                <div id="chartOmni" class="w-full h-[220px]"></div>
+            </div>
+
+            <!-- ECharts: 預測對比 -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h3 class="font-bold text-slate-800 mb-2 flex items-center gap-2">🎯 下次領藥落點預測 <span class="text-xs text-slate-400 font-normal bg-slate-100 px-2 py-1 rounded">模型根據最後一次領藥與涵蓋期進行推估</span></h3>
+                <div id="chartPrediction" class="w-full h-[250px]"></div>
+            </div>
+
+            <!-- 兩欄圖表 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h3 class="font-bold text-slate-800 mb-2">⏳ 看診後領藥延遲 <span class="text-sm font-normal text-red-500">(法規上限: 3日內)</span></h3>
+                    <div id="chartRxDelay" class="w-full h-[250px]"></div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h3 class="font-bold text-slate-800 mb-2">📊 歷史領藥空窗期 (斷藥天數) 分佈</h3>
+                    <div id="chartDist" class="w-full h-[250px]"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 腳本邏輯區 -->
+    <script>
+        const tabBtn1 = document.getElementById('tabBtn1'), tabBtn2 = document.getElementById('tabBtn2');
+        const tab1 = document.getElementById('tab1'), tab2 = document.getElementById('tab2');
+        let isModelTrained = false; let availableUids = [];
+
+        function switchTab(target) {
+            if(target === 1) {
+                tab1.classList.remove('hidden'); tab2.classList.add('hidden');
+                tabBtn1.className = "py-2 px-6 text-sm font-bold border-b-2 border-indigo-600 text-indigo-600 transition-colors";
+                tabBtn2.className = "py-2 px-6 text-sm font-bold border-b-2 border-transparent text-slate-600 hover:text-indigo-600 cursor-pointer transition-colors";
+            } else if (target === 2 && isModelTrained) {
+                tab2.classList.remove('hidden'); tab1.classList.add('hidden');
+                tabBtn2.className = "py-2 px-6 text-sm font-bold border-b-2 border-indigo-600 text-indigo-600 transition-colors";
+                tabBtn1.className = "py-2 px-6 text-sm font-bold border-b-2 border-transparent text-slate-600 hover:text-indigo-600 cursor-pointer transition-colors";
+                setTimeout(() => { chartOmni.resize(); chartPrediction.resize(); chartRxDelay.resize(); chartDist.resize(); }, 100);
+            }
+        }
+        tabBtn1.addEventListener('click', () => switchTab(1)); tabBtn2.addEventListener('click', () => switchTab(2));
+
+        // API 1: 生成資料
+        document.getElementById('btnGenerate').addEventListener('click', async function() {
+            this.disabled = true; this.classList.add('opacity-50'); document.getElementById('loadingData').classList.remove('hidden');
+            try {
+                const res = await fetch('/generate_data', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ n_clients: document.getElementById('n_clients').value, simulation_days: document.getElementById('sim_days').value, seq_len: document.getElementById('seq_len').value })
+                });
+                const result = await res.json();
+                if (result.status === 'success') {
+                    document.getElementById('dataPlotContainer').innerHTML = `<img src="data:image/png;base64,${result.data_plot}" class="w-full h-auto object-contain">`;
+                    document.getElementById('modelOverlay').classList.add('hidden'); 
+                } else alert('生成錯誤: ' + result.message);
+            } catch(e) { alert("網路請求失敗"); }
+            this.disabled = false; this.classList.remove('opacity-50'); document.getElementById('loadingData').classList.add('hidden');
+        });
+
+        // API 2: 訓練模型
+        document.getElementById('btnTrain').addEventListener('click', async function() {
+            this.disabled = true; this.classList.add('opacity-50'); document.getElementById('loadingModel').classList.remove('hidden');
+            const metricsContainer = document.getElementById('metricsContainer');
+            metricsContainer.className = "text-sm text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 animate-pulse transition-all"; metricsContainer.innerText = "運算中...";
+            try {
+                const res = await fetch('/train_model', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ epochs: document.getElementById('epochs').value, lr: document.getElementById('lr').value })
+                });
+                const result = await res.json();
+                if (result.status === 'success') {
+                    document.getElementById('resultPlotContainer').innerHTML = `<img src="data:image/png;base64,${result.result_plot}" class="w-full h-auto object-contain">`;
+                    metricsContainer.classList.remove('animate-pulse'); metricsContainer.innerText = `誤差: ${result.metrics["平均天數誤差 (Day Error)"]}`;
+                    isModelTrained = true; tabBtn2.disabled = false; tabBtn2.innerText = "2. 🚀 個案探索儀表板";
+                    tabBtn2.classList.remove('cursor-not-allowed', 'text-slate-400'); tabBtn2.classList.add('text-slate-600', 'cursor-pointer', 'hover:text-indigo-600');
+                    availableUids = result.test_uids || [];
+                    if(availableUids.length > 0) {
+                        const select = document.getElementById('uidSelect');
+                        select.innerHTML = availableUids.map(uid => `<option value="${uid}">${uid}</option>`).join('');
+                        loadPatientData(availableUids[0]);
+                    }
+                } else {
+                    alert('訓練錯誤: ' + result.message); metricsContainer.className = "text-sm text-red-600 bg-red-50 px-3 py-1 rounded-full border border-red-200 transition-all"; metricsContainer.innerText = "訓練失敗";
+                }
+            } catch(e) { alert("網路請求失敗"); }
+            this.disabled = false; this.classList.remove('opacity-50'); document.getElementById('loadingModel').classList.add('hidden');
+        });
+
+
+        // === ECharts 初始化 ===
+        const chartOmni = echarts.init(document.getElementById('chartOmni'));
+        const chartPrediction = echarts.init(document.getElementById('chartPrediction'));
+        const chartDist = echarts.init(document.getElementById('chartDist'));
+        const chartRxDelay = echarts.init(document.getElementById('chartRxDelay'));
+
+        const monthFormatter = function(value) { return '第 ' + Math.floor(value / 30) + ' 月'; };
+        const tooltipFormatter = function(params) { return `${params.seriesName} <br/> <b>${params.name}</b>: 第 ${Math.floor(params.value[0] / 30)} 個月 (第 ${params.value[0]} 天)`; };
+
+        // 讀取現有測試集病患
+        document.getElementById('uidSelect').addEventListener('change', (e) => loadPatientData(e.target.value));
+        document.getElementById('btnPrev').addEventListener('click', () => {
+            const idx = availableUids.indexOf(document.getElementById('uidSelect').value);
+            if(idx > 0) { 
+                document.getElementById('uidSelect').value = availableUids[idx-1]; 
+                loadPatientData(availableUids[idx-1]); 
+            }
+        });
+        document.getElementById('btnNext').addEventListener('click', () => {
+            const idx = availableUids.indexOf(document.getElementById('uidSelect').value);
+            if(idx < availableUids.length - 1) { 
+                document.getElementById('uidSelect').value = availableUids[idx+1]; 
+                loadPatientData(availableUids[idx+1]); 
+            }
+        });
+
+        // --- 核心：圖表渲染邏輯 ---
+        async function loadPatientData(uid) {
+            document.getElementById('patientInfo').innerText = `載入中...`;
+            try {
+                // 正式串接 API 
+                const response = await fetch(`/api/get_patient/${uid}`);
+                const data = await response.json();
+                
+                if(data.error) { 
+                    alert(data.error); 
+                    document.getElementById('patientInfo').innerText = "載入失敗";
+                    return; 
+                }
+
+                document.getElementById('patientInfo').innerHTML = `病患: <span class="text-indigo-600">${data.uid}</span> <span class="text-slate-400 font-normal mx-2">|</span> 診斷: <span class="text-slate-600">${data.disease}</span>`;
+                
+                // 1. 上帝視角
+                const docVisits = data.raw_timeline.map(item => [item.doc_day, '真實看診']);
+                const rxVisits = data.raw_timeline.map(item => [item.rx_day, '藥局紀錄 (模型可見)']);
+                chartOmni.setOption({
+                    tooltip: { trigger: 'item', formatter: tooltipFormatter },
+                    grid: { left: '3%', right: '4%', bottom: '15%', top: '5%', containLabel: true },
+                    xAxis: { type: 'value', scale: true, axisLabel: { formatter: monthFormatter } }, 
+                    yAxis: { type: 'category', data: ['真實看診', '藥局紀錄 (模型可見)'] },
+                    series: [
+                        { name: '看診', type: 'scatter', symbolSize: 10, itemStyle: { color: '#94a3b8' }, data: docVisits },
+                        { name: '領藥', type: 'scatter', symbolSize: 12, itemStyle: { color: '#4f46e5' }, data: rxVisits },
+                        { name: '時間關聯', type: 'line', data: rxVisits, lineStyle: { type: 'dashed', color: '#cbd5e1' }, symbol: 'none', z: -1 }
+                    ]
+                });
+
+                // 2. 預測對比
+                const baseDay = data.prediction.base_day;
+                const lastMDays = data.prediction.last_m_days;
+                const medEndDay = baseDay + lastMDays; 
+                const targetDocDay = medEndDay + data.target.doc_gap;
+                const realDay = medEndDay + data.target.real_gap;
+                const predDay = medEndDay + data.prediction.pred_gap;
+
+
+
+                chartPrediction.setOption({
+                    tooltip: { 
+                        trigger: 'item', 
+                        formatter: function(p) { 
+                            if(p.seriesName === '用藥涵蓋期') return `<b>用藥涵蓋期</b><br/>第 ${Math.floor(p.value[0]/30)} 個月 ~ 第 ${Math.floor(p.value[1]/30)} 個月`;
+                            return `<b>${p.name}</b>: 第 ${Math.floor(p.value[0]/30)} 個月 (第 ${Math.floor(p.value[0])} 天)`; 
+                        } 
+                    },
+                    grid: { left: '5%', right: '8%', bottom: '15%', top: '10%', containLabel: true },
+                    xAxis: { type: 'value', scale: true, min: baseDay - 10, max: Math.max(predDay, realDay) + 10, axisLabel: { formatter: monthFormatter } },
+                    yAxis: { type: 'category', data: ['模型預測領藥', '真實領藥', '真實看診', '基準與用藥期'], axisTick: {show: false} },
+                    series: [
+                        { type: 'line', name: '用藥涵蓋期', data: [ [baseDay, '基準與用藥期'], [medEndDay, '基準與用藥期'] ], lineStyle: { width: 14, color: '#bae6fd', type: 'solid', cap: 'round' }, symbol: 'none', z: 1 },
+                        { type: 'scatter', symbolSize: 10, data: [ { name: '藥物吃完', value: [medEndDay, '基準與用藥期'], itemStyle: { color: '#0284c7' } } ], label: { show: true, position: 'bottom', formatter: '藥物吃完', color: '#0284c7' } },
+                        {
+                            type: 'scatter', symbolSize: 18, z: 3,
+                            label: { 
+                                show: true, position: 'right', fontWeight: 'bold',
+                                formatter: function(p) {
+                                    if(p.data.name === '真實看診') return `真實看診`;
+                                    if(p.data.name === '真實領藥') return `實際領藥\n(總 Gap: ${data.target.real_gap} 天)`;
+                                    if(p.data.name === '預測落點') return `預測落點\n(預測 Gap: ${data.prediction.pred_gap} 天)`;
+                                    return p.data.name;
+                                }
+                            },
+                            data: [
+                                { name: '上次領藥 (基準)', value: [baseDay, '基準與用藥期'], itemStyle: { color: '#64748b' }, label: {position: 'top'} },
+                                { name: '真實看診', value: [targetDocDay, '真實看診'], itemStyle: { color: '#94a3b8' } },
+                                { name: '真實領藥', value: [realDay, '真實領藥'], itemStyle: { color: '#22c55e' } },
+                                { name: '預測落點', value: [predDay, '模型預測領藥'], itemStyle: { color: '#ef4444' } }
+                            ]
+                        },
+                        { type: 'line', name: '看診拖延', data: [ [medEndDay, '基準與用藥期'], [targetDocDay, '真實看診'] ], lineStyle: { width: 2, color: '#f59e0b', type: 'dashed' }, label: { show: true, position: 'middle', formatter: `斷藥 ${data.target.doc_gap} 天 ➔`, color: '#f59e0b', fontWeight: 'bold', fontSize: 13 }, symbol: 'none', z: 2 },
+                        { type: 'line', name: '領藥拖延', data: [ [targetDocDay, '真實看診'], [realDay, '真實領藥'] ], lineStyle: { width: 2, color: '#22c55e', type: 'dashed' }, label: { show: true, position: 'middle', formatter: `延遲 ${data.target.rx_delay} 天 ➔`, color: '#22c55e', fontWeight: 'bold', fontSize: 13 }, symbol: 'none', z: 2 }
+                    ]
+                });
+
+                // 3. 領藥延遲
+                const delayData = data.rx_delays.map((delay, index) => [`第 ${index+1} 次`, delay]);
+                chartRxDelay.setOption({
+                    tooltip: { formatter: '{b}: 看診後 <b>{c}</b> 天領藥' },
+                    grid: { left: '5%', right: '5%', bottom: '15%', top: '15%', containLabel: true },
+                    xAxis: { type: 'category', name: '歷史順序' },
+                    yAxis: { type: 'value', name: '延遲天數', min: 0, minInterval: 1 },
+                    series: [{
+                        type: 'scatter', symbolSize: 16, itemStyle: { color: '#f59e0b' }, data: delayData,
+                        markLine: { data: [{ yAxis: 3, name: '法規底線' }], lineStyle: { color: '#ef4444', type: 'dashed', width: 2 }, label: { formatter: '3日內', position: 'insideEndTop' } }
+                    }]
+                });
+
+                // 4. 空窗期分佈
+                const counts = {}; data.distributions.gaps.forEach(g => { counts[g] = (counts[g] || 0) + 1; });
+                const xData = Object.keys(counts).sort((a,b)=>a-b);
+                chartDist.setOption({
+                    tooltip: { trigger: 'axis', formatter: '斷藥 <b>{b}</b> 天發生了 {c} 次' },
+                    grid: { left: '5%', right: '5%', bottom: '15%', top: '15%', containLabel: true },
+                    xAxis: { type: 'category', data: xData, name: '斷藥天數' },
+                    yAxis: { type: 'value', name: '發生次數', minInterval: 1 },
+                    series: [{ type: 'bar', itemStyle: { color: '#818cf8', borderRadius: [4,4,0,0] }, data: xData.map(k => counts[k]) }]
+                });
+
+            } catch (error) { 
+                console.error(error); 
+                document.getElementById('patientInfo').innerText = "圖表渲染失敗或後端尚未準備就緒";
+            }
+        }
+
+        window.addEventListener('resize', () => { if(chartOmni) chartOmni.resize(); if(chartPrediction) chartPrediction.resize(); if(chartDist) chartDist.resize(); if(chartRxDelay) chartRxDelay.resize(); });
+    </script>
+</body>
+</html>
