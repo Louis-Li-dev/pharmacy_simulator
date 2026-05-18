@@ -69,6 +69,7 @@ class ClinicalSimulationPipeline:
         for client_id in range(1, self.n_clients + 1):
             client_profiles.append({
                 "client_id": f"C_{client_id:03d}",
+                "age": int(np.clip(np.random.normal(58, 16), 18, 95)),
                 "lam_doctor": np.random.uniform(0.5, 4.0),
                 "lam_pharmacy": np.random.uniform(1.5, 4.5),
                 "disease": np.random.choice(self.disease_names),
@@ -118,6 +119,7 @@ class ClinicalSimulationPipeline:
                 
                 records.append({
                     "client_id": client["client_id"],
+                    "age": client["age"],
                     "disease": client["disease"],
                     "doctor_visit_day": current_day,
                     "pharmacy_report_day": pharmacy_visit_day,
@@ -243,6 +245,7 @@ class ClinicalSimulationPipeline:
                 
                 sequences.append({
                     "client_id": client_id,
+                    "age": int(target_visit.get("age", 45)),
                     "disease": target_visit['disease'],
                     "target_pharmacy_day": target_visit['pharmacy_report_day'],
                     "history_window": history_formatted,
