@@ -5,11 +5,11 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
-from torch.utils.data import Dataset
+from torch.utils.data import DataLoader, TensorDataset, Dataset
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
+
 try:
     from scipy.stats import skewnorm
 except ImportError:
@@ -19,12 +19,22 @@ except ImportError:
             return np.random.normal(loc, scale)
 
 
+# ==============================================================================
+# 1. 零售交易模擬器 (Retail Simulation Pipeline)
+# ==============================================================================
 class RetailSimulationPipeline:
+    """
+    藥局門市零售交易紀錄模擬管道。
+    根據顧客年齡、慢性疾病類別與開立處方藥物，結合衛教邏輯與商品銷售機率模型，
+    模擬顧客在藥局門市的連帶消費（如保健食品、零食、成人紙尿褲、包紮用品等）。
+    """
     def __init__(self, n_transactions=5000, seed=42, max_basket_items=4):
         self.n_transactions = n_transactions
         self.seed = seed
         self.max_basket_items = max_basket_items
         self.rng = np.random.default_rng(seed)
+        
+        # 五大慢性疾病對應的常用處方藥物
         self.disease_meds = {
             "Hypertension": ["Lisinopril", "Amlodipine", "HCTZ"],
             "Type_2_Diabetes": ["Metformin", "Glipizide", "Empagliflozin", "Insulin"],
@@ -33,6 +43,8 @@ class RetailSimulationPipeline:
             "Rheumatoid_Arthritis": ["Methotrexate", "Folic_Acid", "Adalimumab"],
         }
         self.disease_names = list(self.disease_meds.keys())
+        
+        # 10 大非處方零售商品 (OTC / 保健食品 / 日用品)
         self.products = [
             "Snacks",
             "Condoms",
@@ -45,6 +57,8 @@ class RetailSimulationPipeline:
             "Adult_Diapers",
             "Sleep_Aids",
         ]
+        
+        # 藥物別名與歸類映射
         self.med_aliases = {
             "Hypertension_Meds": self.disease_meds["Hypertension"],
             "Diabetes_Meds": self.disease_meds["Type_2_Diabetes"],
@@ -55,6 +69,7 @@ class RetailSimulationPipeline:
         self.transactions = None
 
     def _prob_decay(self, age, start, end, max_p, min_p):
+        """ 年齡隨時間遞減的機率曲線 (如年輕人消費品：零食、保險套) """
         if age <= start:
             return max_p
         if age >= end:
@@ -62,6 +77,7 @@ class RetailSimulationPipeline:
         return max_p - ((age - start) / (end - start)) * (max_p - min_p)
 
     def _prob_grow(self, age, start, end, min_p, max_p):
+        """ 年齡隨時間遞增的機率曲線 (如中老年保健品：成人紙尿褲、奶粉) """
         if age <= start:
             return min_p
         if age >= end:
@@ -69,9 +85,13 @@ class RetailSimulationPipeline:
         return min_p + ((age - start) / (end - start)) * (max_p - min_p)
 
     def _prob_bell(self, age, peak, sigma, max_p):
+        """ 鐘形高斯機率曲線 (如中年消費品：咖啡、助眠品) """
         return max_p * np.exp(-0.5 * ((age - peak) / sigma) ** 2)
 
     def _product_probabilities(self, age, disease):
+        """
+        計算特定年齡與疾病背景下的零售商品購買機率矩陣（包含衛生教育情境微調）。
+        """
         probs = {
             "Snacks": self._prob_decay(age, 18, 40, 0.80, 0.10),
             "Condoms": self._prob_decay(age, 18, 45, 0.60, 0.00),
@@ -84,6 +104,7 @@ class RetailSimulationPipeline:
             "Adult_Diapers": self._prob_grow(age, 65, 90, 0.00, 0.60),
             "Sleep_Aids": self._prob_bell(age, 50, 15, 0.30),
         }
+        # 疾病情境微調 (如高血壓減少咖啡、糖尿病減少高糖零食並增加傷口處置品)
         modifiers = {
             "Hypertension": {"Coffee": -0.40, "Sleep_Aids": 0.30, "Supplements": 0.20},
             "Type_2_Diabetes": {"Snacks": -0.60, "Bandages": 0.50, "Milk_Powder": 0.30},
@@ -96,6 +117,7 @@ class RetailSimulationPipeline:
         return probs
 
     def generate_transactions(self):
+        """ 產生 n_transactions 筆合成購物籃數據 """
         records = []
         for tx_id in range(self.n_transactions):
             age_group = self.rng.choice(["young", "middle", "elderly"], p=[0.15, 0.40, 0.45])
@@ -131,6 +153,7 @@ class RetailSimulationPipeline:
         return self.transactions
 
     def generate_relationship_table(self):
+        """ 計算處方藥物與零售商品之間的連帶銷售頻率共現矩陣 """
         if self.transactions is None:
             self.generate_transactions()
         matrix = pd.DataFrame(0, index=self.meds, columns=self.products)
@@ -144,6 +167,7 @@ class RetailSimulationPipeline:
         return matrix
 
     def expand_meds(self, meds_list):
+        """ 展開藥物別名 """
         expanded = []
         for med in meds_list:
             if med in self.med_aliases:
@@ -153,6 +177,7 @@ class RetailSimulationPipeline:
         return sorted(set(expanded))
 
     def prepare_tensors(self):
+        """ 將交易紀錄轉換為 PyTorch 模型所需的張量 X (年齡 + 藥物) 與 Y (零售商品) """
         if self.transactions is None:
             self.generate_transactions()
         med_to_idx = {med: idx for idx, med in enumerate(self.meds)}
@@ -169,6 +194,7 @@ class RetailSimulationPipeline:
         return X, Y, med_to_idx, prod_to_idx
 
     def to_diffusion_frame(self):
+        """ 轉成適用於 Tabular Diffusion 模型的 DataFrame 格式 """
         if self.transactions is None:
             self.generate_transactions()
         rows = []
@@ -180,7 +206,11 @@ class RetailSimulationPipeline:
         return pd.DataFrame(rows)
 
 
+# ==============================================================================
+# 2. PyTorch 購物籃資料集 (Basket Dataset)
+# ==============================================================================
 class BasketDataset(Dataset):
+    """ 零售購物籃的 Dataset 封裝類別 """
     def __init__(self, X, Y):
         self.X = X
         self.Y = Y
@@ -192,7 +222,15 @@ class BasketDataset(Dataset):
         return self.X[idx], self.Y[idx]
 
 
+# ==============================================================================
+# 3. 零售商品推薦神經網路 (Product Recommender Neural Network)
+# ==============================================================================
 class ProductRecommenderNN(nn.Module):
+    """
+    基於前饋神經網路 (MLP) 的零售連帶商品推薦模型。
+    輸入特徵：年齡與當次領取的慢性病處方藥物向量。
+    輸出標籤：10 大非處方零售商品的推薦機率。
+    """
     def __init__(self, input_dim, num_products, hidden_dim=64):
         super().__init__()
         self.net = nn.Sequential(
@@ -206,14 +244,16 @@ class ProductRecommenderNN(nn.Module):
     def forward(self, x):
         return self.net(x)
 
-# ==========================================
-# 模組 1：資料生成器 (Data Generator)
-# ==========================================
+
+# ==============================================================================
+# 4. 漸進式情境模擬器 (Gradient Context Simulator)
+# ==============================================================================
 class GradientContextSimulator:
+    """
+    用於產生具備醫藥情境微調（Contextual Modifiers）的高階零售模擬資料集。
+    """
     def __init__(self, n_samples=10000):
         self.n_samples = n_samples
-        
-        # 1. 擴充為 5 大慢性疾病
         self.diseases = [
             "Hypertension (高血壓)", 
             "Type_2_Diabetes (第二型糖尿病)", 
@@ -221,8 +261,6 @@ class GradientContextSimulator:
             "Hyperlipidemia (高血脂)", 
             "Rheumatoid_Arthritis (風濕關節炎)"
         ]
-        
-        # 2. 零售商品庫維持不變 (Target Y)
         self.retail_products = [
             "Snacks (零食)", "Condoms (保險套)", "Cosmetics (化妝品)", 
             "Shampoo (洗髮精)", "Milk_Powder (成人奶粉)", "Bandages (傷用包紮)", 
@@ -246,7 +284,6 @@ class GradientContextSimulator:
     def generate_data(self):
         records = []
         for _ in range(self.n_samples):
-            # 決定病患年齡層
             group = np.random.choice(['young', 'middle', 'elderly'], p=[0.15, 0.40, 0.45])
             if group == 'young': raw_age = np.clip(skewnorm.rvs(a=4, loc=18, scale=6), 18, 30)
             elif group == 'middle': raw_age = np.random.normal(45, 7)
@@ -255,13 +292,12 @@ class GradientContextSimulator:
             age = int(np.round(raw_age))
             disease = np.random.choice(self.diseases)
             
-            # 基礎購物機率 (隨年齡變化)
             p_items = {
                 "Snacks (零食)": self.prob_decay(age, 18, 40, 0.8, 0.1),
                 "Condoms (保險套)": self.prob_decay(age, 18, 45, 0.6, 0.0),
                 "Cosmetics (化妝品)": self.prob_decay(age, 18, 55, 0.5, 0.1),
                 "Coffee (咖啡)": self.prob_bell(age, 35, 15, 0.6),
-                "Shampoo (洗髮精)": 0.2, # 日用品基線
+                "Shampoo (洗髮精)": 0.2,
                 "Supplements (保健食品)": self.prob_grow(age, 25, 70, 0.1, 0.7),
                 "Milk_Powder (成人奶粉)": self.prob_grow(age, 50, 80, 0.0, 0.5),
                 "Bandages (傷用包紮)": self.prob_grow(age, 40, 80, 0.05, 0.2),
@@ -269,39 +305,29 @@ class GradientContextSimulator:
                 "Sleep_Aids (助眠品)": self.prob_bell(age, 50, 15, 0.3)
             }
             
-            # ==========================================
-            # 💊 全新醫藥情境邏輯 (Contextual Modifiers)
-            # ==========================================
+            # 依衛教常識進行產品消費比重調整
             if disease == "Hypertension (高血壓)":
-                # 衛教：高血壓需減少咖啡因，並關注睡眠品質
                 p_items["Coffee (咖啡)"] = max(0.0, p_items["Coffee (咖啡)"] - 0.4) 
                 p_items["Sleep_Aids (助眠品)"] = min(1.0, p_items["Sleep_Aids (助眠品)"] + 0.3)
                 p_items["Supplements (保健食品)"] = min(1.0, p_items["Supplements (保健食品)"] + 0.2)
 
             elif disease == "Type_2_Diabetes (第二型糖尿病)":
-                # 衛教：嚴格控糖，並極度注重末梢神經與傷口照護 (糖尿病足)
                 p_items["Snacks (零食)"] = max(0.0, p_items["Snacks (零食)"] - 0.6)
                 p_items["Bandages (傷用包紮)"] = min(1.0, p_items["Bandages (傷用包紮)"] + 0.5) 
-                p_items["Milk_Powder (成人奶粉)"] = min(1.0, p_items["Milk_Powder (成人奶粉)"] + 0.3) # 糖尿病專用奶粉
+                p_items["Milk_Powder (成人奶粉)"] = min(1.0, p_items["Milk_Powder (成人奶粉)"] + 0.3)
 
             elif disease == "Asthma (氣喘)":
-                # 衛教：避免化學香精刺激氣管，咖啡因有輕微擴張支氣管效果
                 p_items["Cosmetics (化妝品)"] = max(0.0, p_items["Cosmetics (化妝品)"] - 0.3)
                 p_items["Coffee (咖啡)"] = min(1.0, p_items["Coffee (咖啡)"] + 0.1)
 
             elif disease == "Hyperlipidemia (高血脂)":
-                # 衛教：心血管保養 (魚油、紅麴等)
                 p_items["Supplements (保健食品)"] = min(1.0, p_items["Supplements (保健食品)"] + 0.4)
 
             elif disease == "Rheumatoid_Arthritis (風濕關節炎)":
-                # 衛教：關節疼痛需護具/包紮，且慢性痛易影響睡眠
                 p_items["Bandages (傷用包紮)"] = min(1.0, p_items["Bandages (傷用包紮)"] + 0.4)
                 p_items["Sleep_Aids (助眠品)"] = min(1.0, p_items["Sleep_Aids (助眠品)"] + 0.3)
-                p_items["Supplements (保健食品)"] = min(1.0, p_items["Supplements (保健食品)"] + 0.2) # 關節保養品
+                p_items["Supplements (保健食品)"] = min(1.0, p_items["Supplements (保健食品)"] + 0.2)
             
-            # ==========================================
-            # 轉換為購物籃 (限制 1~4 件)
-            # ==========================================
             basket = {'age': age, 'Disease': disease}
             for item in self.retail_products: basket[item] = 0.0
                 
@@ -316,11 +342,12 @@ class GradientContextSimulator:
             
         return pd.DataFrame(records)
 
-# ==========================================
-# 模組 2：共用評估函數 (Evaluation)
-# ==========================================
+
+# ==============================================================================
+# 5. 評估與動態指標函數 (Dynamic Evaluation Metrics)
+# ==============================================================================
 def evaluate_metrics_dynamic(y_true, y_pred_probs, threshold=0.5):
-    """計算 Precision, Recall, Jaccard (限制推薦長度 1~4)"""
+    """ 計算 Precision, Recall, Jaccard 相似度指標 (限制推薦長度為 Top 1~4 件) """
     precisions, recalls, jaccards = [], [], []
     
     for i in range(y_true.size(0)):
@@ -346,6 +373,7 @@ def evaluate_metrics_dynamic(y_true, y_pred_probs, threshold=0.5):
     return np.mean(precisions), np.mean(recalls), np.mean(jaccards)
 
 def print_evaluation_report(model_name, precision, recall, jaccard):
+    """ 印出評估結果格式化報表 """
     print("="*45)
     print(f"🏆 {model_name} 評估結果 (測試集未看過資料)")
     print("="*45)
@@ -354,10 +382,12 @@ def print_evaluation_report(model_name, precision, recall, jaccard):
     print(f"🔹 Jaccard 相似度     : {jaccard:.4f}")
     print("="*45)
 
-# ==========================================
-# 模組 3：Diffusion 網路架構
-# ==========================================
+
+# ==============================================================================
+# 6. 表格數據擴散模型 (Tabular DDPM Architecture)
+# ==============================================================================
 class ContextEmbedding(nn.Module):
+    """ 上下文嵌入層 (整合年齡與疾病類別) """
     def __init__(self, num_diseases, num_ages=120, emb_dim=32):
         super().__init__()
         self.disease_emb = nn.Embedding(num_embeddings=num_diseases, embedding_dim=emb_dim)
@@ -372,6 +402,7 @@ class ContextEmbedding(nn.Module):
         return self.fuse(torch.cat([a_emb, d_emb], dim=1))
 
 class ConditionalDenoisingMLP(nn.Module):
+    """ 條件去噪多層感知機 (Conditional Denoising Network) """
     def __init__(self, y_dim, num_diseases, context_dim=32, time_dim=32):
         super().__init__()
         self.time_mlp = nn.Sequential(nn.Linear(1, time_dim), nn.SiLU(), nn.Linear(time_dim, time_dim))
@@ -387,6 +418,10 @@ class ConditionalDenoisingMLP(nn.Module):
         return self.net(torch.cat([y_t, t_emb, c_emb], dim=1))
 
 class TabularDDPM(nn.Module):
+    """
+    表格去噪擴散概率模型 (Tabular Denoising Diffusion Probabilistic Model, DDPM)。
+    用於對藥局零售購物籃生成式模擬與高維度推薦。
+    """
     def __init__(self, y_dim, num_diseases, n_steps=50):
         super().__init__()
         self.n_steps = n_steps
@@ -396,10 +431,12 @@ class TabularDDPM(nn.Module):
         self.alpha_bar = torch.cumprod(self.alpha, dim=0)
 
     def forward_noise(self, y0, t, noise):
+        """ 前向加噪過程 """
         alpha_bar_t = self.alpha_bar[t].view(-1, 1)
         return torch.sqrt(alpha_bar_t) * y0 + torch.sqrt(1 - alpha_bar_t) * noise
 
     def sample(self, age, disease_idx):
+        """ 反向去噪採樣過程 """
         self.model.eval()
         batch_size = age.shape[0]
         device = age.device
@@ -415,13 +452,16 @@ class TabularDDPM(nn.Module):
                 
         return (y_t + 1.0) / 2.0
 
-# ==========================================
-# 模組 4：封裝訓練函數 (Trainers)
-# ==========================================
+
+# ==============================================================================
+# 7. 模型訓練封裝函式 (Trainers)
+# ==============================================================================
 def train_diffusion(train_df, products, num_diseases, config):
+    """
+    訓練 Tabular DDPM 擴散模型。
+    """
     print(f"\n🚀 啟動擴散模型訓練 (Epochs: {config['diff_epochs']}, Steps: {config['diff_steps']})...")
     
-    # 資料準備
     age_tensor = torch.tensor(train_df['age'].values, dtype=torch.long)
     disease_tensor = torch.tensor(train_df['Disease_Encoded'].values, dtype=torch.long)
     Y_true = torch.tensor(train_df[products].values, dtype=torch.float32)
@@ -430,13 +470,13 @@ def train_diffusion(train_df, products, num_diseases, config):
     dataset = TensorDataset(age_tensor, disease_tensor, Y_scaled, Y_true)
     dataloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=True)
     
-    # 初始化模型
     y_dim = Y_scaled.shape[1]
     ddpm = TabularDDPM(y_dim=y_dim, num_diseases=num_diseases, n_steps=config['diff_steps'])
     optimizer = optim.Adam(ddpm.parameters(), lr=config['lr'])
     loss_fn = nn.MSELoss()
 
     start_time = time.time()
+    epoch_losses = []
     for epoch in range(config['diff_epochs']):
         ddpm.train()
         total_loss = 0
@@ -454,13 +494,18 @@ def train_diffusion(train_df, products, num_diseases, config):
             optimizer.step()
             total_loss += loss.item()
             
-        if (epoch+1) % 10 == 0:
-            print(f"   Epoch [{epoch+1}/{config['diff_epochs']}], Loss: {total_loss/len(dataloader):.4f}")
+        avg_loss = total_loss / max(1, len(dataloader))
+        epoch_losses.append(avg_loss)
+        if (epoch+1) % 10 == 0 or epoch == config['diff_epochs'] - 1:
+            print(f"   Epoch [{epoch+1}/{config['diff_epochs']}], Loss: {avg_loss:.4f}")
             
     print(f"✅ Diffusion 訓練完成！耗時: {time.time() - start_time:.2f} 秒")
-    return ddpm
+    return ddpm, epoch_losses
 
 def train_random_forest(train_df, products, config):
+    """
+    訓練隨機森林 (Random Forest) 基線模型。
+    """
     print(f"\n🌲 啟動隨機森林訓練 (Trees: {config['rf_estimators']}, Depth: {config['rf_max_depth']})...")
     X_train = pd.get_dummies(train_df[['age', 'Disease']], columns=['Disease']).values
     Y_train = train_df[products].values
@@ -476,11 +521,8 @@ def train_random_forest(train_df, products, config):
     print(f"✅ RF 訓練完成！耗時: {time.time() - start_time:.2f} 秒")
     return rf_model
 
-# ==========================================
-# 主程式 (Main Pipeline)
-# ==========================================
+
 if __name__ == "__main__":
-    # --- 0. 設定所有超參數 ---
     config = {
         "n_samples": 10000,
         "test_size": 0.2,
@@ -493,43 +535,33 @@ if __name__ == "__main__":
         "eval_threshold": 0.5
     }
 
-    # --- 1. 生成與切分資料 ---
     print("產生模擬資料中...")
     simulator = GradientContextSimulator(n_samples=config['n_samples'])
     df = simulator.generate_data()
     products = simulator.retail_products
     
-    # 全局 Label Encoding 以確保 Train/Test 對齊
     encoder = LabelEncoder()
     df['Disease_Encoded'] = encoder.fit_transform(df['Disease'])
     num_diseases = len(encoder.classes_)
     
-    # 嚴謹的 Train-Test Split (特徵與目標一起切)
     train_df, test_df = train_test_split(df, test_size=config['test_size'], random_state=42)
     print(f"資料準備完畢。訓練集: {len(train_df)}筆, 測試集: {len(test_df)}筆")
 
-    # --- 2. 訓練與評估 Diffusion Model ---
-    ddpm_model = train_diffusion(train_df, products, num_diseases, config)
+    ddpm_model, _ = train_diffusion(train_df, products, num_diseases, config)
     
-    # 準備測試資料
     test_age = torch.tensor(test_df['age'].values, dtype=torch.long)
     test_disease = torch.tensor(test_df['Disease_Encoded'].values, dtype=torch.long)
     test_Y_true = torch.tensor(test_df[products].values, dtype=torch.float32)
     
-    # 採樣評估
     diff_pred_probs = ddpm_model.sample(test_age, test_disease)
     diff_p, diff_r, diff_j = evaluate_metrics_dynamic(test_Y_true, diff_pred_probs, threshold=config['eval_threshold'])
     print_evaluation_report("擴散模型 (Tabular DDPM)", diff_p, diff_r, diff_j)
 
-    # --- 3. 訓練與評估 Random Forest ---
     rf_model = train_random_forest(train_df, products, config)
-    
-    # 準備測試資料 (需保持 get_dummies 的欄位對齊，此處為簡化寫法)
     X_test_rf = pd.get_dummies(test_df[['age', 'Disease']], columns=['Disease']).reindex(
         columns=pd.get_dummies(train_df[['age', 'Disease']], columns=['Disease']).columns, fill_value=0
     ).values
     
-    # 推論評估
     rf_proba_list = rf_model.predict_proba(X_test_rf)
     rf_pred_probs_np = np.column_stack([probs[:, 1] for probs in rf_proba_list])
     rf_pred_probs = torch.tensor(rf_pred_probs_np, dtype=torch.float32)

@@ -2,3 +2,4 @@ config_data/
 *.csv
 __pycache__/
 *.zip
+walk*

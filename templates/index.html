@@ -3,526 +3,2063 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pharmacy Simulator</title>
+    <title>藥局模擬與智慧推薦系統 - 進階工作區</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- ECharts -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <!-- Leaflet Map CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-        .tab-active { border-color: #111827; color: #111827; }
-        .tab-disabled { color: #9ca3af; cursor: not-allowed; }
-        .drop-active { background: #f8fafc; border-color: #111827; }
-        .pill { display:inline-flex; align-items:center; border:1px solid #cbd5e1; background:#f8fafc; padding:2px 8px; font-size:12px; margin:2px; }
-        .preview-table td, .preview-table th { padding: 10px 12px; vertical-align: top; }
+        body { font-family: "Outfit", "PingFang TC", "Microsoft JhengHei", sans-serif; }
+        .tab-active { border-color: #0f172a; color: #0f172a; border-bottom-width: 3px; font-weight: 700; }
+        .tab-disabled { color: #94a3b8; cursor: not-allowed; }
+        .subtab-active { background-color: #0f172a; color: #ffffff; }
+        .pill { display: inline-flex; align-items: center; border: 1px solid #e2e8f0; background: #f8fafc; padding: 2px 8px; font-size: 11px; margin: 2px; border-radius: 4px; font-weight: 500; }
+        .preview-table td, .preview-table th { padding: 10px 12px; vertical-align: middle; }
+        .btn-animation { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        .btn-animation:hover { transform: translateY(-1px); }
+        .btn-animation:active { transform: translateY(0); }
+        #databasesBar::-webkit-scrollbar {
+            height: 6px;
+        }
+        #databasesBar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        #databasesBar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        #databasesBar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        .toast {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            background-color: #10b981;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            z-index: 9999;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .toast.error {
+            background-color: #ef4444;
+        }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-950">
-    <main class="mx-auto max-w-7xl p-6 space-y-6">
-        <header class="bg-white border border-slate-200 p-6">
-            <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm backdrop-blur bg-white/95">
+        <div class="mx-auto max-w-7xl px-6 py-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight text-slate-900 bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">藥局回訪與商品智慧推薦系統</h1>
+                <p class="text-xs text-slate-500 mt-1">整合 LSTM 回訪預測、商品擴散生成模型與地理空間數據的智慧管理系統</p>
+            </div>
+            
+            <div class="flex items-center gap-3 text-xs">
                 <div>
-                    <h1 class="text-3xl font-semibold tracking-tight">藥局回訪與商品推薦預測系統</h1>
-                    <p class="text-sm text-slate-600 mt-2">上傳 fake_data.csv，訓練 LSTM 與 diffusion，檢視回訪時間、藥品與順帶購買商品預測。</p>
-                </div>
-                <div class="text-xs text-slate-500 leading-5">
-                    <div>設定流程：<code>config_generator.py</code> -> <code>config_data/config.csv</code></div>
-                    <div>資料流程：<code>seed_csv_generator.py</code> -> <code>fake_data.csv</code></div>
+                    <label class="block font-bold text-slate-700 mb-0.5">下載語言</label>
+                    <select id="downloadLangSelect" class="border border-slate-300 bg-white p-1 rounded font-sans text-slate-800">
+                        <option value="zh">繁體中文 (Traditional Chinese)</option>
+                        <option value="en">English (英文)</option>
+                    </select>
                 </div>
             </div>
-        </header>
+        </div>
+    </header>
 
-        <nav class="bg-white border border-slate-200 px-4 flex gap-2 overflow-x-auto">
-            <button id="tabUploadBtn" class="tab-active border-b-2 px-4 py-3 text-sm font-semibold">1. 資料上傳</button>
-            <button id="tabTrainBtn" class="tab-disabled border-b-2 border-transparent px-4 py-3 text-sm font-semibold" disabled>2. 模型訓練</button>
-            <button id="tabResultBtn" class="tab-disabled border-b-2 border-transparent px-4 py-3 text-sm font-semibold" disabled>3. 結果分析</button>
-            <button id="tabFutureBtn" class="tab-disabled border-b-2 border-transparent px-4 py-3 text-sm font-semibold" disabled>4. 未來預測</button>
-        </nav>
+    <!-- Multi-Database Selection Bar -->
+    <section class="bg-white border-b border-slate-100 shadow-inner">
+        <div class="mx-auto max-w-7xl px-6 py-3 flex flex-col md:flex-row items-start md:items-center gap-3">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider shrink-0">資料庫選擇 / Databases</span>
+            <div id="databasesBar" class="flex gap-2 overflow-x-auto py-1 scrollbar-thin flex-1 w-full">
+                <!-- Dynamically loaded databases -->
+            </div>
+            <button id="createNewDbBtn" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded shrink-0 btn-animation">＋ 新增資料庫</button>
+        </div>
+    </section>
 
-        <section id="tabUpload" class="space-y-6">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="bg-white border border-slate-200 p-5 space-y-4">
-                    <h2 class="text-lg font-semibold">上傳 fake_data.csv</h2>
-                    <div id="dropZone" class="border-2 border-dashed border-slate-300 p-8 text-center cursor-pointer">
-                        <div class="font-semibold">拖曳 CSV 到這裡</div>
-                        <div class="text-sm text-slate-500 mt-2">或點擊選擇檔案</div>
-                        <input id="fileInput" type="file" accept=".csv" class="hidden">
+    <!-- Global Progress Checklist / Checkpoints Bar -->
+    <section class="bg-slate-50 border-b border-slate-200">
+        <div class="mx-auto max-w-7xl px-6 py-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 text-xs">
+                <!-- Checkpoint 1 -->
+                <div id="chkActiveDb" class="bg-white border p-3 rounded-lg shadow-sm flex items-center gap-3 border-red-200">
+                    <div id="chkActiveDbNum" class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-red-100 text-red-700">1</div>
+                    <div>
+                        <div class="font-bold text-slate-700">選擇資料庫</div>
+                        <div id="chkActiveDbVal" class="text-slate-500 font-mono">未選擇</div>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <label class="text-sm">
-                            歷史視窗長度
-                            <input id="seqLen" type="number" value="5" min="1" class="mt-1 w-full border border-slate-300 p-2">
-                        </label>
-                        <label class="text-sm">
-                            訓練切分比例
-                            <input id="splitRatio" type="number" value="0.8" min="0.1" max="0.95" step="0.05" class="mt-1 w-full border border-slate-300 p-2">
-                        </label>
+                </div>
+                <!-- Checkpoint 2 -->
+                <div id="chkDataStatus" class="bg-white border p-3 rounded-lg shadow-sm flex items-center gap-3 border-red-200">
+                    <div id="chkDataStatusNum" class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-red-100 text-red-700">2</div>
+                    <div>
+                        <div class="font-bold text-slate-700">資料庫內容</div>
+                        <div id="chkDataStatusVal" class="text-slate-500">0 病患 | 0 超商</div>
                     </div>
-                    <div class="flex gap-3">
-                        <button id="uploadBtn" class="flex-1 bg-slate-950 text-white px-4 py-2 text-sm font-semibold disabled:opacity-40" disabled>上傳</button>
-                        <button id="clearBtn" class="border border-slate-300 px-4 py-2 text-sm font-semibold">清除</button>
+                </div>
+                <!-- Checkpoint 3 -->
+                <div id="chkMapping" class="bg-white border p-3 rounded-lg shadow-sm flex items-center gap-3 border-red-200">
+                    <div id="chkMappingNum" class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-red-100 text-red-700">3</div>
+                    <div>
+                        <div class="font-bold text-slate-700">超商與病患分配</div>
+                        <div class="flex items-center gap-2 mt-0.5">
+                            <span id="chkMappingVal" class="text-slate-500 font-semibold">未分配</span>
+                            <button id="chkMappingBtn" class="hidden bg-slate-900 text-white text-[10px] px-2 py-0.5 rounded font-bold hover:bg-slate-800 transition-colors">隨機分配</button>
+                        </div>
                     </div>
-                    <p id="uploadStatus" class="text-sm text-slate-600">尚未選擇檔案。</p>
+                </div>
+                <!-- Checkpoint 4 -->
+                <div id="chkModel" class="bg-white border p-3 rounded-lg shadow-sm flex items-center gap-3 border-red-200">
+                    <div id="chkModelNum" class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-red-100 text-red-700">4</div>
+                    <div>
+                        <div class="font-bold text-slate-700">模型載入狀態</div>
+                        <div id="chkModelVal" class="text-slate-500">未載入模型</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Force Database Creation Overlay -->
+    <div id="forceDbOverlay" class="hidden flex-1 flex flex-col items-center justify-center p-8 bg-slate-50 min-h-[60vh] max-w-md mx-auto my-12 border border-slate-200 rounded-2xl shadow-xl space-y-6">
+        <div class="w-16 h-16 bg-slate-900 text-white rounded-full flex items-center justify-center text-3xl shadow">📂</div>
+        <div class="text-center">
+            <h2 class="text-xl font-bold text-slate-900">啟動首個資料庫專案</h2>
+            <p class="text-xs text-slate-500 mt-2">目前沒有任何已建立的資料庫。請在下方輸入名稱以建立並載入首個專案，解鎖工作區。</p>
+        </div>
+        <div class="w-full space-y-3">
+            <label class="block text-xs font-bold text-slate-700">新專案名稱</label>
+            <input id="forceDbNameInput" type="text" placeholder="例如: default 或 project_a" class="w-full border border-slate-300 px-3 py-2 rounded-lg text-sm bg-white focus:outline-none focus:border-slate-900">
+            <button id="forceCreateDbBtn" class="w-full bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-lg font-bold text-sm shadow btn-animation">建立首個資料庫</button>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="bg-white border-b border-slate-200 shadow-sm sticky top-[73px] z-20">
+        <div class="mx-auto max-w-7xl px-6 flex gap-3 overflow-x-auto">
+            <button id="tabDbBtn" class="tab-active px-4 py-3.5 text-sm font-semibold border-b-2 border-slate-900 text-slate-900">1. 資料庫管理與超商</button>
+            <button id="tabTrainBtn" class="tab-disabled px-4 py-3.5 text-sm font-semibold border-b-2 border-transparent text-slate-400" disabled>2. 模型訓練與管理</button>
+            <button id="tabResultBtn" class="tab-disabled px-4 py-3.5 text-sm font-semibold border-b-2 border-transparent text-slate-400" disabled>3. 結果分析</button>
+            <button id="tabFutureBtn" class="tab-disabled px-4 py-3.5 text-sm font-semibold border-b-2 border-transparent text-slate-400" disabled>4. 未來預測</button>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 mx-auto max-w-7xl w-full px-6 py-6 space-y-6">
+        
+        <!-- SECTION 1: DATABASE & STORES (Tab 1) -->
+        <section id="tabDb" class="space-y-6">
+            <!-- Sub-tabs inside Tab 1 -->
+            <div class="flex gap-2 border-b border-slate-200 pb-3">
+                <button id="subtabPatientsBtn" class="subtab-active text-xs font-bold px-4 py-2 rounded-lg transition-colors">分頁 1.1：病患資料庫管理</button>
+                <button id="subtabStoresBtn" class="bg-slate-200 text-slate-700 hover:bg-slate-350 text-xs font-bold px-4 py-2 rounded-lg transition-colors">分頁 1.2：超商與定位地圖</button>
+            </div>
+
+            <!-- Subtab 1.1: Patients Data Manager -->
+            <div id="subtabPatients" class="space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <!-- Left: Upload & Config Card -->
+                    <div class="bg-white border border-slate-200 p-5 space-y-4 shadow-sm rounded-xl">
+                        <h2 class="text-base font-bold text-slate-900 border-b pb-2 flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 bg-slate-900 rounded-full"></span>資料上傳
+                        </h2>
+                        
+                        <div id="dropZone" class="border-2 border-dashed border-slate-200 p-6 text-center cursor-pointer rounded-lg hover:border-slate-500 transition-colors bg-slate-50/50">
+                            <div class="font-semibold text-sm">拖曳 CSV 到這裡</div>
+                            <div class="text-xs text-slate-400 mt-1">或點擊選擇檔案</div>
+                            <input id="fileInput" type="file" accept=".csv" class="hidden">
+                        </div>
+
+                        <div class="space-y-3">
+                            <label class="text-xs font-bold text-slate-700 block">
+                                資料庫寫入模式
+                                <select id="uploadMode" class="mt-1 w-full border border-slate-200 p-2 bg-white rounded">
+                                    <option value="overwrite">覆蓋現有資料 (Overwrite)</option>
+                                    <option value="append">附加/合併資料 (Append)</option>
+                                </select>
+                            </label>
+                            
+                            <div class="grid grid-cols-2 gap-2">
+                                <label class="text-xs font-bold text-slate-700 block">
+                                    歷史視窗長度
+                                    <input id="seqLen" type="number" value="5" min="1" class="mt-1 w-full border border-slate-200 p-2 rounded">
+                                </label>
+                                <label class="text-xs font-bold text-slate-700 block">
+                                    訓練切分比例
+                                    <input id="splitRatio" type="number" value="0.8" min="0.1" max="0.95" step="0.05" class="mt-1 w-full border border-slate-200 p-2 rounded">
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-2 pt-2">
+                            <button id="uploadBtn" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded text-sm font-semibold disabled:opacity-40 btn-animation" disabled>上傳</button>
+                            <button id="clearBtn" class="border border-slate-200 hover:bg-slate-50 px-4 py-2 rounded text-sm font-semibold btn-animation">清除</button>
+                        </div>
+                        <p id="uploadStatus" class="text-xs text-slate-500 text-center">正在偵測資料庫內容...</p>
+                    </div>
+
+                    <!-- Right: Database Records Viewer -->
+                    <div class="lg:col-span-3 bg-white border border-slate-200 p-5 shadow-sm rounded-xl flex flex-col space-y-4">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between border-b pb-3 gap-3">
+                            <div>
+                                <h2 class="text-base font-bold text-slate-900">病患領藥記錄</h2>
+                                <p class="text-xs text-slate-500 mt-0.5">檢視及修改 SQLite 中的病患領藥與商品推薦記錄</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <input id="dbSearchInput" type="text" placeholder="搜尋 使用者ID 或 疾病..." class="border border-slate-200 px-3 py-1.5 text-xs rounded w-48 md:w-56 focus:outline-none focus:border-slate-500">
+                                <button id="addRecordBtn" class="bg-slate-900 hover:bg-slate-800 text-white text-xs px-3 py-1.5 font-bold rounded flex items-center gap-1 btn-animation">
+                                    <span>＋</span> 新增記錄
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Datatable -->
+                        <div class="overflow-x-auto border border-slate-100 rounded-lg flex-1">
+                            <table class="w-full text-xs preview-table">
+                                <thead class="bg-slate-50 border-b border-slate-200 text-left sticky top-0">
+                                    <tr>
+                                        <th class="font-bold text-slate-700">使用者 ID</th>
+                                        <th class="font-bold text-slate-700">年齡</th>
+                                        <th class="font-bold text-slate-700">疾病</th>
+                                        <th class="font-bold text-slate-700">看診日</th>
+                                        <th class="font-bold text-slate-700">領藥日</th>
+                                        <th class="font-bold text-slate-700">用藥天數</th>
+                                        <th class="font-bold text-slate-700">藥品與商品</th>
+                                        <th class="font-bold text-slate-700 text-center">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dbRecordsTableBody" class="divide-y divide-slate-100">
+                                    <tr>
+                                        <td colspan="8" class="p-8 text-center text-slate-400 text-xs">尚無資料，請上傳 CSV 或新增記錄</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        <div class="flex justify-between items-center text-xs text-slate-500">
+                            <span id="dbRecordsPageInfo">第 1 頁，共 1 頁 (共 0 筆)</span>
+                            <div class="flex gap-1">
+                                <button id="dbRecordsPrevBtn" class="border border-slate-200 hover:bg-slate-50 px-2.5 py-1.5 rounded disabled:opacity-40" disabled>上一頁</button>
+                                <button id="dbRecordsNextBtn" class="border border-slate-200 hover:bg-slate-50 px-2.5 py-1.5 rounded disabled:opacity-40" disabled>下一頁</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="lg:col-span-2 bg-white border border-slate-200 p-5">
-                    <div class="flex items-center justify-between">
-                        <h2 class="text-lg font-semibold">資料摘要</h2>
-                        <span id="summaryBadge" class="text-xs bg-slate-100 px-3 py-1 text-slate-600">未解鎖</span>
+                <!-- Database summary cards -->
+                <div class="bg-white border border-slate-200 p-5 shadow-sm rounded-xl space-y-4">
+                    <div class="flex justify-between items-center border-b pb-2">
+                        <h3 class="font-bold text-slate-900">資料庫統計分析</h3>
+                        <span id="summaryBadge" class="text-xs bg-slate-100 px-2.5 py-0.5 rounded-full text-slate-600 font-semibold">未就緒</span>
                     </div>
-                    <div id="summaryCards" class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4"></div>
-                    <div id="summaryPlotWrap" class="mt-5 min-h-[300px] border border-slate-200 bg-slate-50 flex items-center justify-center text-sm text-slate-500">
-                        Upload data to see statistics.
+                    <div id="summaryCards" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3"></div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div id="summaryPlotWrap" class="min-h-[280px] border border-slate-100 rounded-lg bg-slate-50 flex items-center justify-center text-xs text-slate-400">
+                            請先載入資料庫查看統計圖
+                        </div>
+                        <div id="timelinePreviewWrap" class="min-h-[280px] border border-slate-100 rounded-lg bg-white flex items-center justify-center text-xs text-slate-400">
+                            時間線檢視區
+                        </div>
                     </div>
-                    <div id="timelinePreviewWrap" class="mt-5 min-h-[300px] border border-slate-200 bg-white flex items-center justify-center text-sm text-slate-500">
-                        Model-view timeline preview will appear here.
+                </div>
+            </div>
+
+            <!-- Subtab 1.2: Convenience Stores Map & Editor -->
+            <div id="subtabStores" class="hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Left Sidebar: Stores List and Editor -->
+                    <div class="space-y-6">
+                        <!-- OSM API Fetcher Card -->
+                        <div class="bg-white border border-slate-200 p-5 space-y-4 shadow-sm rounded-xl">
+                            <h2 class="text-base font-bold text-slate-900 border-b pb-2">超商資料 API 獲取</h2>
+                            <p class="text-xs text-slate-500">從 OpenStreetMap Nominatim 獲取指定數量的超商並儲存至本地資料庫，用於模擬客戶位置。</p>
+                            <label class="text-sm block">
+                                欲獲取超商數量 (10 - 500)
+                                <input id="storeLimitInput" type="number" value="100" min="10" max="500" class="mt-1 w-full border border-slate-200 p-2 rounded">
+                            </label>
+                            <button id="fetchStoresBtn" class="w-full bg-slate-950 hover:bg-slate-800 text-white px-4 py-2 text-sm font-semibold rounded btn-animation">獲取並存入資料庫</button>
+                            <p id="fetchStoresStatus" class="text-xs text-slate-500">目前資料庫狀態：載入中...</p>
+                        </div>
+
+                        <!-- Convenience Stores CRUD List -->
+                        <div class="bg-white border border-slate-200 p-5 shadow-sm rounded-xl space-y-3">
+                            <div class="flex justify-between items-center border-b pb-2">
+                                <h2 class="text-base font-bold text-slate-900">超商資料庫列表</h2>
+                                <button id="addStoreBtn" class="bg-slate-900 hover:bg-slate-800 text-white text-xs px-2 py-1 rounded font-bold btn-animation">新增超商</button>
+                            </div>
+                            <div class="max-h-[300px] overflow-y-auto border border-slate-100 rounded-lg divide-y divide-slate-50" id="storesList">
+                                <div class="p-3 text-center text-slate-400 text-xs">載入中...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Map View & Selected Store Editor -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <!-- Map Viewer -->
+                        <div class="bg-white border border-slate-200 p-4 shadow-sm rounded-xl flex flex-col space-y-3">
+                            <h3 class="font-bold text-slate-900 flex justify-between items-center text-sm border-b pb-2">
+                                <span>超商地理定位地圖 (Leaflet)</span>
+                                <span class="text-xs text-slate-500">藍點：超商位置 | 紅點：所屬模擬客戶</span>
+                            </h3>
+                            <div id="storeMap" style="height: 420px;" class="w-full border border-slate-200 bg-slate-100 rounded-lg shadow-inner"></div>
+                        </div>
+
+                        <!-- Store Inline Editor Form -->
+                        <div id="storeEditPanel" class="hidden bg-white border border-slate-200 p-5 shadow-sm rounded-xl space-y-4">
+                            <h3 class="font-bold text-slate-900 text-sm border-b pb-2">修改選取之超商欄位</h3>
+                            <input type="hidden" id="editStoreOsmId">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                                <label class="block">
+                                    中文店名
+                                    <input id="editStoreName" type="text" class="mt-1 w-full border p-2 bg-white">
+                                </label>
+                                <label class="block">
+                                    英文店名
+                                    <input id="editStoreNameEn" type="text" class="mt-1 w-full border p-2 bg-white">
+                                </label>
+                                <label class="block">
+                                    中文地址
+                                    <input id="editStoreAddress" type="text" class="mt-1 w-full border p-2 bg-white">
+                                </label>
+                                <label class="block">
+                                    英文地址
+                                    <input id="editStoreAddressEn" type="text" class="mt-1 w-full border p-2 bg-white">
+                                </label>
+                                <label class="block">
+                                    緯度 (Latitude)
+                                    <input id="editStoreLat" type="number" step="0.000001" class="mt-1 w-full border p-2 bg-white">
+                                </label>
+                                <label class="block">
+                                    經度 (Longitude)
+                                    <input id="editStoreLon" type="number" step="0.000001" class="mt-1 w-full border p-2 bg-white">
+                                </label>
+                            </div>
+                            <div class="flex justify-end gap-2 text-sm pt-2">
+                                <button id="deleteStoreBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded font-semibold btn-animation">刪除</button>
+                                <button id="saveStoreBtn" class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-1.5 rounded font-semibold btn-animation">儲存修改</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </section>
 
+        <!-- SECTION 2: MODEL CONFIG & MANAGEMENT (Tab 2) -->
         <section id="tabTrain" class="hidden space-y-6">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="bg-white border border-slate-200 p-5 space-y-4">
-                    <h2 class="text-lg font-semibold">訓練設定</h2>
-                    <label class="text-sm block">
-                        LSTM 訓練輪數
-                        <input id="epochs" type="number" value="5" min="1" class="mt-1 w-full border border-slate-300 p-2">
-                    </label>
-                    <label class="text-sm block">
-                        商品推薦 NN 輪數
-                        <input id="retailEpochs" type="number" value="8" min="1" class="mt-1 w-full border border-slate-300 p-2">
-                    </label>
-                    <label class="text-sm block">
-                        Diffusion 輪數
-                        <input id="diffEpochs" type="number" value="8" min="1" class="mt-1 w-full border border-slate-300 p-2">
-                    </label>
-                    <label class="text-sm block">
-                        學習率
-                        <input id="lr" type="number" value="0.005" min="0.0001" step="0.0005" class="mt-1 w-full border border-slate-300 p-2">
-                    </label>
-                    <button id="trainBtn" class="w-full bg-slate-950 text-white px-4 py-2 text-sm font-semibold">開始訓練 LSTM + Diffusion</button>
-                </div>
-                <div class="lg:col-span-2 bg-white border border-slate-200 p-5">
-                    <h2 class="text-lg font-semibold">訓練紀錄與進度</h2>
-                    <div class="mt-4 h-3 bg-slate-100 overflow-hidden">
-                        <div id="progressBar" class="h-full bg-slate-950 w-0 transition-all"></div>
+            <!-- Training Warning Banner if mapping is incomplete -->
+            <div id="mappingWarningBanner" class="hidden bg-rose-50 border-l-4 border-rose-500 p-4 rounded-r-xl">
+                <div class="flex">
+                    <div class="shrink-0"><span class="text-rose-500 font-bold text-sm">⚠</span></div>
+                    <div class="ml-3">
+                        <p class="text-xs text-rose-800 font-semibold">
+                            檢測到資料尚未隨機對齊超商！請先返回【1. 資料庫管理與超商】點選【隨機分配】對齊，才能啟動模型訓練。
+                        </p>
                     </div>
-                    <pre id="trainLog" class="mt-4 h-[320px] overflow-auto bg-slate-950 text-slate-100 p-4 text-xs whitespace-pre-wrap">等待資料上傳。</pre>
                 </div>
             </div>
-            <div class="bg-white border border-slate-200 p-5">
-                <h2 class="text-lg font-semibold">模型分析</h2>
-                <div id="modelMetrics" class="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4"></div>
-                <div id="modelAnalysisPlotWrap" class="mt-5 min-h-[320px] border border-slate-200 bg-white flex items-center justify-center text-sm text-slate-500">
-                    訓練後會顯示藥品預測分析。
+
+            <div id="trainMainGrid" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Left: Training Trigger -->
+                <div class="bg-white border border-slate-200 p-5 space-y-4 shadow-sm rounded-xl">
+                    <h2 class="text-base font-bold text-slate-900 border-b pb-2">啟動全新模型訓練</h2>
+                    <label class="text-xs font-bold text-slate-700 block">
+                        LSTM 訓練輪數 (Refill Epochs)
+                        <input id="epochs" type="number" value="10" min="1" class="mt-1 w-full border border-slate-200 p-2 rounded bg-white">
+                    </label>
+                    <label class="text-xs font-bold text-slate-700 block">
+                        商品推薦 NN 輪數 (NN Epochs)
+                        <input id="retailEpochs" type="number" value="15" min="1" class="mt-1 w-full border border-slate-200 p-2 rounded bg-white">
+                    </label>
+                    <label class="text-xs font-bold text-slate-700 block">
+                        Diffusion 擴散模型輪數 (Diffusion Epochs)
+                        <input id="diffEpochs" type="number" value="15" min="1" class="mt-1 w-full border border-slate-200 p-2 rounded bg-white">
+                    </label>
+                    <label class="text-xs font-bold text-slate-700 block">
+                        學習率 (Learning Rate)
+                        <input id="lr" type="number" value="0.005" min="0.0001" step="0.0005" class="mt-1 w-full border border-slate-200 p-2 rounded bg-white">
+                    </label>
+                    <button id="trainBtn" class="w-full bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 text-sm font-semibold rounded btn-animation">開始訓練模型</button>
+                    
+                    <div class="mt-4 border-t pt-3">
+                        <h4 class="text-xs font-bold text-slate-700">訓練進度</h4>
+                        <div class="mt-2 h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div id="progressBar" class="h-full bg-slate-900 w-0 transition-all"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Model Version Checkpoint Controller -->
+                <div class="lg:col-span-2 bg-white border border-slate-200 p-5 shadow-sm rounded-xl flex flex-col space-y-4">
+                    <h2 class="text-base font-bold text-slate-900 border-b pb-2">模型版本管理器</h2>
+                    <p class="text-xs text-slate-500">檢視已訓練並儲存於 <code>models/</code> 的 checkpoint 列表，切換使用或刪除舊模型</p>
+                    
+                    <!-- Checkpoints list -->
+                    <div class="overflow-x-auto border rounded-lg">
+                        <table class="w-full text-xs text-left">
+                            <thead class="bg-slate-50 border-b">
+                                <tr>
+                                    <th class="p-3 font-bold text-slate-700">版本 ID</th>
+                                    <th class="p-3 font-bold text-slate-700">關聯資料庫</th>
+                                    <th class="p-3 font-bold text-slate-700">訓練日期</th>
+                                    <th class="p-3 font-bold text-slate-700">領藥 MAE</th>
+                                    <th class="p-3 font-bold text-slate-700 text-center">狀態</th>
+                                    <th class="p-3 font-bold text-slate-700 text-right">動作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="modelsTableBody">
+                                <tr>
+                                    <td colspan="6" class="p-4 text-center text-slate-400 text-xs">查無已存模型</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Selected checkpoint detailed analytics -->
+                    <div id="selectedModelDetail" class="hidden bg-slate-50 p-4 border rounded-lg space-y-3">
+                        <h3 class="font-bold text-slate-900 text-xs border-b pb-1.5">版本分析資訊</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                            <div><span class="text-slate-400">訓練輪數:</span> <strong id="detailEpochs"></strong></div>
+                            <div><span class="text-slate-400">NN 輪數:</span> <strong id="detailNnEpochs"></strong></div>
+                            <div><span class="text-slate-400">擴散輪數:</span> <strong id="detailDiffEpochs"></strong></div>
+                            <div><span class="text-slate-400">學習率:</span> <strong id="detailLr"></strong></div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Loss Convergence Chart -->
+                            <div class="bg-white p-3 border rounded">
+                                <h4 class="text-xs font-bold text-slate-700 mb-2">訓練損失收斂圖 (Loss Curves)</h4>
+                                <div id="lossChart" style="height: 280px;" class="w-full"></div>
+                            </div>
+                            <!-- Log window -->
+                            <div class="bg-white p-3 border rounded flex flex-col">
+                                <h4 class="text-xs font-bold text-slate-700 mb-2">詳細訓練紀錄 (stdout)</h4>
+                                <pre id="trainLog" class="h-[280px] overflow-y-auto bg-slate-900 text-slate-100 p-3 rounded text-[10px] whitespace-pre-wrap flex-1"></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Model Evaluation Plot -->
+            <div class="bg-white border border-slate-200 p-5 shadow-sm rounded-xl space-y-3">
+                <h2 class="text-base font-bold text-slate-900">活性模型成效預估指標</h2>
+                <div id="modelMetrics" class="grid grid-cols-1 md:grid-cols-4 gap-3"></div>
+                <div id="modelAnalysisPlotWrap" class="min-h-[320px] border border-slate-100 rounded-lg flex items-center justify-center text-xs text-slate-400 bg-slate-50">
+                    藥品領用比對分析圖
                 </div>
             </div>
         </section>
 
+        <!-- SECTION 3: RESULTS VIEW (Tab 3) -->
         <section id="tabResult" class="hidden space-y-6">
-            <div class="bg-white border border-slate-200 p-5 flex flex-col md:flex-row gap-4 md:items-end md:justify-between">
+            <div class="bg-white border border-slate-200 p-5 shadow-sm rounded-xl flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
                 <div>
-                    <h2 class="text-lg font-semibold">結果與視覺化</h2>
-                    <p class="text-sm text-slate-600 mt-1">模型只看得到被遮住目標回訪之前的歷史。</p>
+                    <h2 class="text-base font-bold text-slate-900">回訪模型預測結果與視覺化</h2>
+                    <p class="text-xs text-slate-500 mt-1">此處為測試窗口 (Test Window) 的領藥回訪與商品推薦召回率分析 (以靜態基準 2026-07-06 計算日期)</p>
                 </div>
-                <div class="flex gap-3 items-end">
-                    <label class="text-sm">
-                        使用者
-                        <select id="patientSelect" class="mt-1 min-w-[140px] border border-slate-300 p-2"></select>
+                <div class="flex flex-wrap items-center gap-3">
+                    <label class="text-xs font-bold text-slate-700 flex items-center gap-1">
+                        病患ID
+                        <select id="patientSelect" class="border border-slate-300 bg-white p-2 rounded focus:outline-none focus:ring-1 focus:ring-slate-900 w-36"></select>
                     </label>
-                    <a id="downloadLink" href="/api/download_results" class="bg-slate-950 text-white px-4 py-2 text-sm font-semibold">下載結果 CSV</a>
+                    <a id="downloadLink" href="/api/download_results" class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded text-xs font-semibold btn-animation text-center">下載結果 CSV</a>
                 </div>
             </div>
 
-            <div id="patientInfoPanel" class="bg-white border border-slate-200 p-5">
-                <h3 class="font-semibold">使用者資訊</h3>
-                <div id="patientInfoCards" class="grid grid-cols-1 md:grid-cols-4 gap-3 mt-3"></div>
+            <!-- Patient Information Cards -->
+            <div id="patientInfoPanel" class="bg-white border border-slate-200 p-5 shadow-sm rounded-xl space-y-3">
+                <h3 class="font-bold text-slate-900 text-sm">使用者檔案資訊</h3>
+                <div id="patientInfoCards" class="grid grid-cols-1 md:grid-cols-4 gap-3"></div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="bg-white border border-slate-200 p-5">
-                    <h3 class="font-semibold">回訪時間線預測</h3>
-                    <div id="visitChart" class="h-[360px] mt-3"></div>
+            <!-- Visualizers: visit charts and patient location map -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="bg-white border border-slate-200 p-5 shadow-sm rounded-xl h-[460px] flex flex-col">
+                    <h3 class="font-bold text-slate-900 text-sm border-b pb-2 flex justify-between items-center shrink-0">
+                        <span>病患定位地圖 / Patient Map</span>
+                        <span class="text-[10px] text-slate-400">紅點：病患住址 | 藍點：分配超商</span>
+                    </h3>
+                    <div id="resultsPatientMap" class="w-full mt-3 border rounded bg-slate-100 shadow-inner flex-1"></div>
                 </div>
-                <div class="bg-white border border-slate-200 p-5">
-                    <h3 class="font-semibold">商品推薦 Recall</h3>
-                    <div id="retailChart" class="h-[360px] mt-3"></div>
+                <div class="bg-white border border-slate-200 p-5 shadow-sm rounded-xl h-[460px] flex flex-col">
+                    <h3 class="font-bold text-slate-900 text-sm border-b pb-2 shrink-0">回訪時間線比對圖 (真實日期)</h3>
+                    <div id="visitChart" class="w-full mt-3 flex-1"></div>
+                </div>
+                <div class="bg-white border border-slate-200 p-5 shadow-sm rounded-xl h-[460px] flex flex-col">
+                    <h3 class="font-bold text-slate-900 text-sm border-b pb-2 shrink-0">商品推薦 Recall 收斂召回率</h3>
+                    <div id="retailChart" class="w-full mt-3 flex-1"></div>
                 </div>
             </div>
 
-            <div class="bg-white border border-slate-200 p-5 overflow-auto">
-                <h3 class="font-semibold mb-3">預測結果表</h3>
-                <table class="w-full text-sm preview-table">
-                    <thead class="text-left border-b border-slate-200 bg-slate-50 sticky top-0">
-                        <tr>
-                            <th class="py-2">使用者</th>
-                            <th>實際時間</th>
-                            <th>預測時間</th>
-                            <th>時間差</th>
-                            <th>實際藥品</th>
-                            <th>預測藥品</th>
-                            <th>實際商品</th>
-                            <th>推薦商品</th>
-                            <th>Recall</th>
-                        </tr>
-                    </thead>
-                    <tbody id="resultTable"></tbody>
-                </table>
-            </div>
-        </section>
-
-        <section id="tabFuture" class="hidden space-y-6">
-            <div class="bg-white border border-slate-200 p-5 flex flex-col md:flex-row gap-4 md:items-end md:justify-between">
-                <div>
-                    <h2 class="text-lg font-semibold">未來預測</h2>
-                    <p class="text-sm text-slate-600 mt-1">預測所有使用者或單一使用者未來 N 天的回訪、藥品與順帶商品。</p>
-                </div>
-                <div class="flex flex-wrap gap-3 items-end">
-                    <label class="text-sm">
-                        使用者
-                        <select id="futurePatientSelect" class="mt-1 min-w-[140px] border border-slate-300 p-2"></select>
-                    </label>
-                    <label class="text-sm">
-                        未來天數
-                        <input id="futureDays" type="number" value="180" min="30" class="mt-1 w-28 border border-slate-300 p-2">
-                    </label>
-                    <button id="futureBtn" class="bg-slate-950 text-white px-4 py-2 text-sm font-semibold">開始預測</button>
-                </div>
-            </div>
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="bg-white border border-slate-200 p-5">
-                    <h3 class="font-semibold">未來預測時間線</h3>
-                    <div id="futureChart" class="h-[360px] mt-3"></div>
-                </div>
-                <div class="bg-white border border-slate-200 p-5 overflow-auto">
-                    <h3 class="font-semibold mb-3">未來預測表</h3>
-                    <table class="w-full text-sm preview-table">
-                        <thead class="text-left border-b border-slate-200 bg-slate-50">
+            <!-- Results Table -->
+            <div class="bg-white border border-slate-200 p-5 shadow-sm rounded-xl">
+                <h3 class="font-bold text-slate-900 text-sm border-b pb-2 mb-3">預測結果明細表</h3>
+                <div class="max-h-[500px] overflow-y-auto border border-slate-100 rounded-lg">
+                    <table class="w-full text-xs preview-table text-left">
+                        <thead class="border-b border-slate-200 bg-slate-50 sticky top-0 z-10">
                             <tr>
-                                <th>使用者</th>
-                                <th>預測時間</th>
-                                <th>疾病</th>
-                                <th>預測藥品</th>
-                                <th>推薦商品</th>
+                                <th class="font-bold text-slate-700">使用者</th>
+                                <th class="font-bold text-slate-700">超商門市</th>
+                                <th class="font-bold text-slate-700">真實日期</th>
+                                <th class="font-bold text-slate-700">預測日期</th>
+                                <th class="font-bold text-slate-700">偏離天數</th>
+                                <th class="font-bold text-slate-700">預估誤差</th>
+                                <th class="font-bold text-slate-700">實際偏差</th>
+                                <th class="font-bold text-slate-700">預測藥品</th>
+                                <th class="font-bold text-slate-700">推薦商品</th>
+                                <th class="font-bold text-slate-700">召回率</th>
                             </tr>
                         </thead>
-                        <tbody id="futureTable"></tbody>
+                        <tbody id="resultTable" class="divide-y divide-slate-100"></tbody>
                     </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 4: FUTURE FORECAST (Tab 4) -->
+        <section id="tabFuture" class="hidden space-y-6">
+            <div class="bg-white border border-slate-200 p-5 shadow-sm rounded-xl flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
+                <div>
+                    <h2 class="text-base font-bold text-slate-900">未來回訪長程預估</h2>
+                    <p class="text-xs text-slate-500 mt-1">預測未來幾個月的領藥日期與商品搭配 (專為未來預估客製化起始日期)</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 text-xs">
+                    <!-- Date Picker relocated to forecast tab -->
+                    <div class="bg-slate-100 p-2 rounded-lg border border-slate-200 flex items-center gap-2">
+                        <label class="font-bold text-slate-700">預估起始日期</label>
+                        <input id="baseDateInput" type="date" value="2026-07-06" class="border border-slate-300 bg-white px-2 py-1 rounded text-slate-800 focus:outline-none">
+                    </div>
+                    <label class="font-bold text-slate-700 flex items-center gap-1">
+                        病患篩選
+                        <select id="futurePatientSelect" class="border border-slate-300 bg-white p-2 rounded focus:outline-none focus:ring-1 focus:ring-slate-900 w-36"></select>
+                    </label>
+                    <label class="font-bold text-slate-700 flex items-center gap-1">
+                        預測天數
+                        <input id="futureDays" type="number" value="180" min="30" class="border border-slate-300 p-1.5 rounded w-24">
+                    </label>
+                    <button id="futureBtn" class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded font-semibold btn-animation">執行未來預估</button>
+                    <button id="downloadFutureBtn" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded font-semibold btn-animation">下載預測 CSV</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <!-- Forecast Map (shows selected forecast patient coordinates) -->
+                <div class="bg-white border border-slate-200 p-5 shadow-sm rounded-xl h-[460px] flex flex-col">
+                    <h3 class="font-bold text-slate-900 text-sm border-b pb-2 flex justify-between items-center shrink-0">
+                        <span>預估地理對齊 / Forecast Map</span>
+                        <span class="text-[10px] text-slate-400">紅點：病患 | 藍點：超商</span>
+                    </h3>
+                    <div id="futurePatientMap" class="w-full mt-3 border rounded bg-slate-100 shadow-inner flex-1"></div>
+                </div>
+
+                <!-- Forecast Chart -->
+                <div class="lg:col-span-2 bg-white border border-slate-200 p-5 shadow-sm rounded-xl h-[460px] flex flex-col">
+                    <h3 class="font-bold text-slate-900 text-sm border-b pb-2 shrink-0">長程時間線推估圖 (預估日期與藥品週期)</h3>
+                    <div id="futureChart" class="w-full mt-3 flex-1"></div>
+                </div>
+
+                <!-- Forecast Table -->
+                <div class="bg-white border border-slate-200 p-5 shadow-sm rounded-xl h-[460px] flex flex-col">
+                    <h3 class="font-bold text-slate-900 text-sm border-b pb-2 mb-3 shrink-0">未來領藥行程推估表</h3>
+                    <div class="overflow-y-auto border border-slate-100 rounded-lg flex-1">
+                        <table class="w-full text-xs preview-table text-left">
+                            <thead class="border-b border-slate-200 bg-slate-50 sticky top-0 z-10">
+                                <tr>
+                                    <th class="font-bold text-slate-700">病患ID</th>
+                                    <th class="font-bold text-slate-700">預估日期</th>
+                                    <th class="font-bold text-slate-700">預期偏差</th>
+                                    <th class="font-bold text-slate-700">智慧推薦商品</th>
+                                </tr>
+                            </thead>
+                            <tbody id="futureTable" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </section>
     </main>
 
+    <!-- CRUD MODAL: ADD/EDIT CLINICAL RECORD -->
+    <div id="recordModal" class="hidden fixed inset-0 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center z-50">
+        <div class="bg-white p-6 border rounded-xl shadow-xl max-w-md w-full space-y-4">
+            <h3 id="recordModalTitle" class="text-base font-bold text-slate-900 border-b pb-2">編輯病患領藥記錄</h3>
+            <input type="hidden" id="formRecordId">
+            <div class="grid grid-cols-2 gap-3 text-xs">
+                <label class="block">
+                    使用者 ID (client_id)
+                    <input id="formClientId" type="text" class="mt-1 w-full border border-slate-200 p-2 rounded bg-white">
+                </label>
+                <label class="block">
+                    年齡 (Age)
+                    <input id="formAge" type="number" class="mt-1 w-full border border-slate-200 p-2 rounded bg-white">
+                </label>
+                <label class="block">
+                    主要疾病 (Disease)
+                    <select id="formDisease" class="mt-1 w-full border border-slate-200 p-2 rounded bg-white">
+                        <option value="Hypertension">Hypertension</option>
+                        <option value="Type_2_Diabetes">Type_2_Diabetes</option>
+                        <option value="Asthma">Asthma</option>
+                        <option value="Hyperlipidemia">Hyperlipidemia</option>
+                        <option value="Rheumatoid_Arthritis">Rheumatoid_Arthritis</option>
+                    </select>
+                </label>
+                <label class="block">
+                    用藥天數 (m_days)
+                    <input id="formMDays" type="number" class="mt-1 w-full border border-slate-200 p-2 rounded bg-white">
+                </label>
+                <label class="block">
+                    看診時間點 (Day)
+                    <input id="formDoctorVisit" type="number" class="mt-1 w-full border border-slate-200 p-2 rounded bg-white">
+                </label>
+                <label class="block">
+                    申報領藥時間點 (Day)
+                    <input id="formPharmacyReport" type="number" class="mt-1 w-full border border-slate-200 p-2 rounded bg-white">
+                </label>
+            </div>
+            <label class="text-xs block">
+                所領藥品名稱 (多筆以 | 隔開)
+                <input id="formMeds" type="text" placeholder="Lisinopril|Amlodipine" class="mt-1 w-full border border-slate-200 p-2 rounded bg-white">
+            </label>
+            <label class="text-xs block">
+                購買順帶商品 (多筆以 | 隔開)
+                <input id="formProducts" type="text" placeholder="Snacks|Coffee" class="mt-1 w-full border border-slate-200 p-2 rounded bg-white">
+            </label>
+            <div class="flex justify-end gap-2 text-sm pt-2">
+                <button id="closeRecordModalBtn" class="border hover:bg-slate-50 px-4 py-2 rounded font-semibold btn-animation">取消</button>
+                <button id="saveRecordModalBtn" class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded font-semibold btn-animation">儲存紀錄</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 mt-auto">
+        <div class="mx-auto max-w-7xl px-6 py-6 text-center text-xs text-slate-400">
+            <p>Pharmacy Simulator & Recommendation Engine - Interactive Dashboard & Database Controller</p>
+        </div>
+    </footer>
+
+    <!-- Frontend Core Scripts -->
     <script>
-        const state = { file: null, uploaded: false, trained: false, testUids: [] };
-        const tabs = {
-            upload: document.getElementById('tabUpload'),
+        // App State
+        const state = {
+            uploaded: false,
+            trained: false,
+            testUids: [],
+            dbPage: 1,
+            dbSearch: '',
+            dbLimit: 5,
+            activeModelId: '',
+            modelMae: 4.5,
+            activeDb: 'default',
+            mappingStatus: 'unassigned'
+        };
+
+        // Robust fetch utility to prevent "Unexpected token '<'" parsing failures when HTML is returned
+        async function fetchJson(url, options = {}) {
+            try {
+                const res = await fetch(url, options);
+                const contentType = res.headers.get("content-type");
+                if (contentType && contentType.includes("application/json")) {
+                    return await res.json();
+                }
+                const text = await res.text();
+                return { status: "error", message: text || `HTTP error ${res.status}` };
+            } catch (err) {
+                return { status: "error", message: err.message };
+            }
+        }
+
+        // Custom toast popup notification helper
+        function showToast(message, isError = false) {
+            const toast = document.createElement('div');
+            toast.className = `toast ${isError ? 'error' : ''}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            // Trigger entry animation
+            setTimeout(() => toast.classList.add('show'), 50);
+            
+            // Auto fadeout and remove from DOM after 3.5 seconds total
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 450);
+            }, 3000);
+        }
+
+        // Charts
+        const visitChart = echarts.init(document.getElementById('visitChart'));
+        const retailChart = echarts.init(document.getElementById('retailChart'));
+        const futureChart = echarts.init(document.getElementById('futureChart'));
+        const lossChart = echarts.init(document.getElementById('lossChart'));
+
+        // Tab View Switching
+        const sections = {
+            db: document.getElementById('tabDb'),
             train: document.getElementById('tabTrain'),
             result: document.getElementById('tabResult'),
             future: document.getElementById('tabFuture')
         };
-        const tabButtons = {
-            upload: document.getElementById('tabUploadBtn'),
+
+        const navBtns = {
+            db: document.getElementById('tabDbBtn'),
             train: document.getElementById('tabTrainBtn'),
             result: document.getElementById('tabResultBtn'),
             future: document.getElementById('tabFutureBtn')
         };
-        const visitChart = echarts.init(document.getElementById('visitChart'));
-        const retailChart = echarts.init(document.getElementById('retailChart'));
-        const futureChart = echarts.init(document.getElementById('futureChart'));
 
-        function showTab(name) {
-            Object.entries(tabs).forEach(([key, el]) => el.classList.toggle('hidden', key !== name));
-            Object.entries(tabButtons).forEach(([key, btn]) => {
+        function showSection(name) {
+            Object.entries(sections).forEach(([key, el]) => el.classList.toggle('hidden', key !== name));
+            Object.entries(navBtns).forEach(([key, btn]) => {
                 btn.classList.toggle('tab-active', key === name);
                 btn.classList.toggle('border-transparent', key !== name);
+                btn.classList.toggle('text-slate-900', key === name);
+                btn.classList.toggle('text-slate-500', key !== name && !btn.disabled);
             });
-            setTimeout(() => { visitChart.resize(); retailChart.resize(); }, 80);
+            setTimeout(() => {
+                visitChart.resize();
+                retailChart.resize();
+                futureChart.resize();
+                lossChart.resize();
+                if (name === 'db' && !document.getElementById('subtabStores').classList.contains('hidden')) {
+                    initStoreMap();
+                } else if (name === 'result') {
+                    initResultsPatientMap();
+                } else if (name === 'future') {
+                    initFuturePatientMap();
+                }
+            }, 80);
         }
+
+        navBtns.db.onclick = () => showSection('db');
+        navBtns.train.onclick = () => { if (!navBtns.train.disabled) showSection('train'); };
+        navBtns.result.onclick = () => { if (!navBtns.result.disabled) showSection('result'); };
+        navBtns.future.onclick = () => { if (!navBtns.future.disabled) showSection('future'); };
+
+        // Subtabs inside Tab 1
+        const subtabPatientsBtn = document.getElementById('subtabPatientsBtn');
+        const subtabStoresBtn = document.getElementById('subtabStoresBtn');
+        const subtabPatients = document.getElementById('subtabPatients');
+        const subtabStores = document.getElementById('subtabStores');
+
+        subtabPatientsBtn.onclick = () => {
+            subtabPatientsBtn.className = "subtab-active text-xs font-bold px-4 py-2 rounded-lg transition-colors";
+            subtabStoresBtn.className = "bg-slate-200 text-slate-700 hover:bg-slate-300 text-xs font-bold px-4 py-2 rounded-lg transition-colors";
+            subtabPatients.classList.remove('hidden');
+            subtabStores.classList.add('hidden');
+        };
+
+        subtabStoresBtn.onclick = () => {
+            subtabStoresBtn.className = "subtab-active text-xs font-bold px-4 py-2 rounded-lg transition-colors";
+            subtabPatientsBtn.className = "bg-slate-200 text-slate-700 hover:bg-slate-300 text-xs font-bold px-4 py-2 rounded-lg transition-colors";
+            subtabStores.classList.remove('hidden');
+            subtabPatients.classList.add('hidden');
+            setTimeout(initStoreMap, 80);
+        };
 
         function setUnlocked() {
-            tabButtons.train.disabled = !state.uploaded;
-            tabButtons.train.classList.toggle('tab-disabled', !state.uploaded);
-            tabButtons.result.disabled = !state.trained;
-            tabButtons.result.classList.toggle('tab-disabled', !state.trained);
-            tabButtons.future.disabled = !state.trained;
-            tabButtons.future.classList.toggle('tab-disabled', !state.trained);
+            // Training is unlocked if uploaded AND mapped (assigned)
+            const canTrain = state.uploaded && (state.mappingStatus === 'assigned');
+            navBtns.train.disabled = !state.uploaded; // let them click the tab, but show banner inside if not mapped
+            navBtns.train.classList.toggle('tab-disabled', !state.uploaded);
+            
+            // Toggle Warning Banner inside Train Tab
+            const warningBanner = document.getElementById('mappingWarningBanner');
+            const mainTrainGrid = document.getElementById('trainMainGrid');
+            if (state.uploaded && state.mappingStatus !== 'assigned') {
+                warningBanner.classList.remove('hidden');
+                mainTrainGrid.classList.add('opacity-40', 'pointer-events-none');
+            } else {
+                warningBanner.classList.add('hidden');
+                mainTrainGrid.classList.remove('opacity-40', 'pointer-events-none');
+            }
+
+            navBtns.result.disabled = !state.trained;
+            navBtns.result.classList.toggle('tab-disabled', !state.trained);
+            
+            navBtns.future.disabled = !state.trained;
+            navBtns.future.classList.toggle('tab-disabled', !state.trained);
         }
 
-        function metricCard(label, value) {
-            return `<div class="border border-slate-200 bg-slate-50 p-4"><div class="text-xs text-slate-500">${label}</div><div class="text-2xl font-semibold mt-1">${value}</div></div>`;
+        // Helper: Date & Day formatting
+        function dayToDate(dayNum, useForecastStart = false) {
+            // Results evaluation uses static start date
+            const baseDateStr = useForecastStart ? (document.getElementById('baseDateInput').value || "2026-07-06") : "2026-07-06";
+            const base = new Date(baseDateStr);
+            base.setDate(base.getDate() + Math.round(Number(dayNum)));
+            const y = base.getFullYear();
+            const m = String(base.getMonth() + 1).padStart(2, '0');
+            const d = String(base.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
         }
 
-        tabButtons.upload.onclick = () => showTab('upload');
-        tabButtons.train.onclick = () => { if (state.uploaded) showTab('train'); };
-        tabButtons.result.onclick = () => { if (state.trained) showTab('result'); };
-        tabButtons.future.onclick = () => { if (state.trained) showTab('future'); };
 
+
+        // --- Load Databases Bar ---
+        async function loadDatabasesList() {
+            try {
+                const result = await fetchJson('/api/databases');
+                if (result.status !== 'success') return;
+                
+                state.activeDb = result.active;
+                
+                
+                // Show/hide force creation overlay if no active database is selected
+                const forceDbOverlay = document.getElementById('forceDbOverlay');
+                const mainNav = document.querySelector('nav');
+                const checkpointsBar = document.querySelector('section.bg-slate-50.border-b');
+                const mainContent = document.querySelector('main');
+                
+                // Keep the progress bar visible, but lock nav and main area if no active DB
+                checkpointsBar.classList.remove('hidden');
+                
+                if (!result.active) {
+                    forceDbOverlay.classList.remove('hidden');
+                    mainNav.classList.add('hidden');
+                    mainContent.classList.add('hidden');
+                } else {
+                    forceDbOverlay.classList.add('hidden');
+                    mainNav.classList.remove('hidden');
+                    mainContent.classList.remove('hidden');
+                }
+                
+                const databasesBar = document.getElementById('databasesBar');
+                databasesBar.innerHTML = result.databases.map(db => {
+                    const isActive = db === result.active;
+                    return `
+                        <div class="shrink-0 flex items-center border ${isActive ? 'border-slate-900 bg-slate-900 text-white font-bold' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400'} rounded-lg p-1 px-3 text-xs cursor-pointer shadow-sm btn-animation">
+                            <span onclick="selectDatabase('${db}')" class="py-1">${db}.db</span>
+                            ${db !== 'default' ? `<button onclick="deleteDatabase('${db}')" class="ml-2 font-black ${isActive ? 'text-slate-300 hover:text-white' : 'text-slate-400 hover:text-rose-600'} text-[10px]">✕</button>` : ''}
+                        </div>
+                    `;
+                }).join('');
+                
+                // Toggle Checkpoint 1 active database status classes
+                const chkActiveDb = document.getElementById('chkActiveDb');
+                const chkActiveDbNum = document.getElementById('chkActiveDbNum');
+                
+                if (result.active) {
+                    chkActiveDb.classList.remove('border-red-200');
+                    chkActiveDb.classList.add('border-green-200');
+                    chkActiveDbNum.className = "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-green-100 text-green-700";
+                    document.getElementById('chkActiveDbVal').textContent = `${result.active}.db`;
+                } else {
+                    chkActiveDb.classList.remove('border-green-200');
+                    chkActiveDb.classList.add('border-red-200');
+                    chkActiveDbNum.className = "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-red-100 text-red-700";
+                    document.getElementById('chkActiveDbVal').textContent = `未選擇資料庫`;
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function selectDatabase(name) {
+            try {
+                const result = await fetchJson('/api/databases/select', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name })
+                });
+                if (result.status === 'success') {
+                    state.activeDb = name;
+                    state.dbPage = 1;
+                    
+                    // Reset model loaded state locally unless matched
+                    state.trained = false;
+                    
+                    await loadDatabasesList();
+                    await checkDbStatus();
+                    await loadDbRecords();
+                    await loadModelsList();
+                    
+                    // Switch back to Tab 1 if database switch locked results
+                    if (!state.trained) {
+                        showSection('db');
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        document.getElementById('createNewDbBtn').onclick = async () => {
+            const rawName = prompt("請輸入新資料庫專案名稱 (僅限英數字與下劃線)：", "project_new");
+            if (!rawName) return;
+            const name = rawName.replace(/[^a-zA-Z0-9_-]/g, "").trim();
+            if (!name) {
+                showToast('無效的專案名稱。', true)
+                return;
+            }
+            try {
+                const result = await fetchJson('/api/databases/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name })
+                });
+                if (result.status === 'success') {
+                    selectDatabase(name);
+                } else {
+                    showToast('建立資料庫失敗：' + result.message, true)
+                }
+            } catch (err) {
+                showToast('請求錯誤：' + err.message, true)
+            }
+        };
+
+        // Wire up force creation button click
+        document.getElementById('forceCreateDbBtn').onclick = async () => {
+            const rawName = document.getElementById('forceDbNameInput').value.trim();
+            if (!rawName) {
+                showToast("請輸入專案名稱！", true)
+                return;
+            }
+            const name = rawName.replace(/[^a-zA-Z0-9_-]/g, "").trim();
+            if (!name) {
+                showToast("專案名稱包含無效字元。", true)
+                return;
+            }
+            try {
+                const result = await fetchJson('/api/databases/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name })
+                });
+                if (result.status === 'success') {
+                    document.getElementById('forceDbNameInput').value = '';
+                    await selectDatabase(name);
+                } else {
+                    showToast('建立資料庫失敗：' + result.message, true)
+                }
+            } catch (err) {
+                showToast('連線失敗：' + err.message, true)
+            }
+        };
+
+        async function deleteDatabase(name) {
+            if (!confirm(`確定要刪除專案資料庫 ${name}.db 嗎？這將刪除內含的所有病患與超商數據！`)) return;
+            try {
+                const res = await fetch('/api/databases/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name })
+                });
+                const result = await res.json();
+                if (result.status === 'success') {
+                    loadDatabasesList();
+                    if (state.activeDb === name) {
+                        selectDatabase('default');
+                    }
+                } else {
+                    showToast('刪除失敗：' + result.message, true)
+                }
+            } catch (err) {
+                showToast('請求錯誤：' + err.message, true)
+            }
+        }
+
+        // --- Tab 1.1: Database records table CRUD ---
+        async function loadDbRecords() {
+            const recordsTable = document.getElementById('dbRecordsTableBody');
+            try {
+                const res = await fetch(`/api/records?page=${state.dbPage}&limit=${state.dbLimit}&search=${encodeURIComponent(state.dbSearch)}`);
+                const result = await res.json();
+                if (result.status !== 'success') return;
+
+                if (!result.records || result.records.length === 0) {
+                    recordsTable.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400 text-xs">查無符合條件的病患領藥記錄</td></tr>`;
+                    document.getElementById('dbRecordsPageInfo').textContent = `共 0 筆`;
+                    document.getElementById('dbRecordsPrevBtn').disabled = true;
+                    document.getElementById('dbRecordsNextBtn').disabled = true;
+                    return;
+                }
+
+                recordsTable.innerHTML = result.records.map(r => `
+                    <tr class="hover:bg-slate-50 border-b border-slate-100">
+                        <td class="font-semibold text-slate-800">${r.client_id}</td>
+                        <td>${r.age} 歲</td>
+                        <td><span class="px-2 py-0.5 bg-slate-100 rounded text-slate-700">${r.disease.replace('_', ' ')}</span></td>
+                        <td>${dayToDate(r.doctor_visit_day)} <span class="text-slate-400">(d${r.doctor_visit_day})</span></td>
+                        <td>${dayToDate(r.pharmacy_report_day)} <span class="text-slate-400">(d${r.pharmacy_report_day})</span></td>
+                        <td>${r.m_days} 天</td>
+                        <td>
+                            <div><span class="text-[10px] text-slate-400 font-bold">用藥:</span> ${renderPills(r.meds_received)}</div>
+                            <div class="mt-1"><span class="text-[10px] text-slate-400 font-bold">推薦:</span> ${renderPills(r.retail_products)}</div>
+                        </td>
+                        <td class="text-center space-x-1">
+                            <button onclick="editRecord(${r.id})" class="text-blue-600 hover:text-blue-900 font-semibold border border-blue-100 hover:border-blue-300 px-2 py-1 rounded bg-white">編輯</button>
+                            <button onclick="deleteRecord(${r.id})" class="text-red-600 hover:text-red-900 font-semibold border border-red-100 hover:border-red-300 px-2 py-1 rounded bg-white">刪除</button>
+                        </td>
+                    </tr>
+                `).join('');
+
+                document.getElementById('dbRecordsPageInfo').textContent = `第 ${result.page} 頁，共 ${result.pages} 頁 (共 ${result.total} 筆)`;
+                document.getElementById('dbRecordsPrevBtn').disabled = (result.page <= 1);
+                document.getElementById('dbRecordsNextBtn').disabled = (result.page >= result.pages);
+
+                state.dbPage = result.page;
+            } catch (err) {
+                console.error('Error querying database records', err);
+            }
+        }
+
+        document.getElementById('dbRecordsPrevBtn').onclick = () => {
+            if (state.dbPage > 1) {
+                state.dbPage--;
+                loadDbRecords();
+            }
+        };
+
+        document.getElementById('dbRecordsNextBtn').onclick = () => {
+            state.dbPage++;
+            loadDbRecords();
+        };
+
+        let searchDebounce;
+        document.getElementById('dbSearchInput').oninput = (e) => {
+            clearTimeout(searchDebounce);
+            searchDebounce = setTimeout(() => {
+                state.dbSearch = e.target.value;
+                state.dbPage = 1;
+                loadDbRecords();
+            }, 300);
+        };
+
+        // Edit Record modal trigger
+        async function editRecord(id) {
+            const res = await fetch(`/api/records?page=1&limit=500&search=${state.dbSearch}`);
+            const result = await res.json();
+            const record = result.records.find(r => r.id === id);
+            if (!record) return;
+
+            document.getElementById('formRecordId').value = record.id;
+            document.getElementById('formClientId').value = record.client_id;
+            document.getElementById('formClientId').disabled = true;
+            document.getElementById('formAge').value = record.age;
+            document.getElementById('formDisease').value = record.disease;
+            document.getElementById('formMDays').value = record.m_days;
+            document.getElementById('formDoctorVisit').value = record.doctor_visit_day;
+            document.getElementById('formPharmacyReport').value = record.pharmacy_report_day;
+            document.getElementById('formMeds').value = record.meds_received;
+            document.getElementById('formProducts').value = record.retail_products;
+
+            document.getElementById('recordModalTitle').textContent = "編輯病患領藥記錄";
+            document.getElementById('recordModal').classList.remove('hidden');
+        }
+
+        // Add Record modal trigger
+        document.getElementById('addRecordBtn').onclick = () => {
+            document.getElementById('formRecordId').value = "";
+            document.getElementById('formClientId').value = "";
+            document.getElementById('formClientId').disabled = false;
+            document.getElementById('formAge').value = 50;
+            document.getElementById('formDisease').value = "Hypertension";
+            document.getElementById('formMDays').value = 30;
+            document.getElementById('formDoctorVisit').value = 1;
+            document.getElementById('formPharmacyReport').value = 30;
+            document.getElementById('formMeds').value = "Lisinopril|Amlodipine";
+            document.getElementById('formProducts').value = "Snacks|Coffee";
+
+            document.getElementById('recordModalTitle').textContent = "新增病患領藥記錄";
+            document.getElementById('recordModal').classList.remove('hidden');
+        };
+
+        document.getElementById('closeRecordModalBtn').onclick = () => {
+            document.getElementById('recordModal').classList.add('hidden');
+        };
+
+        document.getElementById('saveRecordModalBtn').onclick = async () => {
+            const id = document.getElementById('formRecordId').value;
+            const body = {
+                client_id: document.getElementById('formClientId').value.trim(),
+                age: parseInt(document.getElementById('formAge').value),
+                disease: document.getElementById('formDisease').value,
+                m_days: parseInt(document.getElementById('formMDays').value),
+                doctor_visit_day: parseInt(document.getElementById('formDoctorVisit').value),
+                pharmacy_report_day: parseInt(document.getElementById('formPharmacyReport').value),
+                meds_received: document.getElementById('formMeds').value.trim(),
+                retail_products: document.getElementById('formProducts').value.trim()
+            };
+
+            if (!body.client_id) {
+                showToast('請輸入使用者 ID', true)
+                return;
+            }
+
+            const url = id ? '/api/records/update' : '/api/records/add';
+            if (id) body.id = parseInt(id);
+
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const result = await res.json();
+                if (result.status === 'success') {
+                    document.getElementById('recordModal').classList.add('hidden');
+                    loadDbRecords();
+                    checkDbStatus();
+                } else {
+                    showToast('儲存失敗：' + result.message, true)
+                }
+            } catch (err) {
+                showToast('請求發生錯誤：' + err.message, true)
+            }
+        };
+
+        async function deleteRecord(id) {
+            if (!confirm("確定要刪除這筆病患領藥紀錄嗎？")) return;
+            try {
+                const res = await fetch('/api/records/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: id })
+                });
+                const result = await res.json();
+                if (result.status === 'success') {
+                    loadDbRecords();
+                    checkDbStatus();
+                } else {
+                    showToast('刪除失敗：' + result.message, true)
+                }
+            } catch (err) {
+                showToast('刪除發生錯誤：' + err.message, true)
+            }
+        }
+
+        // CSV Upload UI
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
         const uploadBtn = document.getElementById('uploadBtn');
         const uploadStatus = document.getElementById('uploadStatus');
 
         dropZone.onclick = () => fileInput.click();
-        dropZone.ondragover = (event) => { event.preventDefault(); dropZone.classList.add('drop-active'); };
+        dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('drop-active'); };
         dropZone.ondragleave = () => dropZone.classList.remove('drop-active');
-        dropZone.ondrop = (event) => {
-            event.preventDefault();
+        dropZone.ondrop = (e) => {
+            e.preventDefault();
             dropZone.classList.remove('drop-active');
-            setFile(event.dataTransfer.files[0]);
+            setFile(e.dataTransfer.files[0]);
         };
         fileInput.onchange = () => setFile(fileInput.files[0]);
 
         function setFile(file) {
             state.file = file || null;
             uploadBtn.disabled = !state.file;
-            uploadStatus.textContent = state.file ? `已選擇：${state.file.name}` : '尚未選擇檔案。';
+            uploadStatus.textContent = state.file ? `已選擇：${state.file.name}` : '已就緒，請上傳檔案。';
         }
 
         uploadBtn.onclick = async () => {
             if (!state.file) return;
-            uploadStatus.textContent = '上傳並解析中...';
+            uploadStatus.textContent = '上傳與資料庫寫入中...';
             const form = new FormData();
             form.append('file', state.file);
+            form.append('mode', document.getElementById('uploadMode').value);
             form.append('seq_len', document.getElementById('seqLen').value);
             form.append('split_ratio', document.getElementById('splitRatio').value);
-            const res = await fetch('/api/upload_data', { method: 'POST', body: form });
-            const result = await res.json();
-            if (result.status !== 'success') {
-                uploadStatus.textContent = result.message || '上傳失敗。';
-                return;
+            
+            try {
+                const res = await fetch('/api/upload_data', { method: 'POST', body: form });
+                const result = await res.json();
+                if (result.status !== 'success') {
+                    uploadStatus.textContent = result.message || '上傳與寫入資料庫失敗。';
+                    return;
+                }
+                state.uploaded = true;
+                state.trained = false;
+                
+                await checkDbStatus();
+                uploadStatus.textContent = '上傳完成，已成功儲存至 SQLite，請點隨機分配超商！';
+                renderSummary(result.summary, result.summary_plot, result.timeline_preview);
+                loadDbRecords();
+            } catch (err) {
+                uploadStatus.textContent = '發生連線錯誤：' + err.message;
             }
-            state.uploaded = true;
-            state.trained = false;
-            setUnlocked();
-            uploadStatus.textContent = '上傳完成，已解鎖模型訓練。';
-            renderSummary(result.summary, result.summary_plot, result.timeline_preview);
         };
 
         document.getElementById('clearBtn').onclick = async () => {
+            if (!confirm("確定要清除資料庫中所有的病患領藥紀錄嗎？")) return;
             await fetch('/api/clear_upload', { method: 'POST' });
             state.file = null;
             state.uploaded = false;
             state.trained = false;
             fileInput.value = '';
-            setUnlocked();
-            showTab('upload');
-            uploadStatus.textContent = '尚未選擇檔案。';
+            
+            await checkDbStatus();
+            uploadStatus.textContent = '資料庫病患紀錄已清空。';
             document.getElementById('summaryCards').innerHTML = '';
             document.getElementById('summaryPlotWrap').innerHTML = '上傳資料後顯示統計。';
             document.getElementById('timelinePreviewWrap').innerHTML = '上傳後顯示模型視角時間線。';
-            document.getElementById('summaryBadge').textContent = '未解鎖';
+            document.getElementById('summaryBadge').textContent = '未就緒';
+            loadDbRecords();
         };
+
+        function metricCard(label, value) {
+            return `<div class="border border-slate-100 bg-slate-50/50 p-3 rounded-lg"><div class="text-[10px] text-slate-400 font-bold">${label}</div><div class="text-lg font-bold text-slate-800 mt-1">${value}</div></div>`;
+        }
 
         function renderSummary(summary, plot, timelinePreview) {
             document.getElementById('summaryBadge').textContent = '已就緒';
             document.getElementById('summaryCards').innerHTML = [
                 metricCard('資料列數', summary.rows),
                 metricCard('使用者數', summary.clients),
-                metricCard('疾病數', summary.diseases),
-                metricCard('訓練/測試序列', `${summary.train_sequences}/${summary.test_sequences}`),
-                metricCard('藥品數', summary.meds),
-                metricCard('商品數', summary.products),
-                metricCard('平均年齡', summary.age.mean),
-                metricCard('年齡範圍', `${summary.age.min}-${summary.age.max}`)
+                metricCard('疾病種類', summary.diseases),
+                metricCard('訓練序列', summary.train_sequences),
+                metricCard('測試序列', summary.test_sequences),
+                metricCard('藥品品項', summary.meds),
+                metricCard('商品品項', summary.products),
+                metricCard('平均年齡', `${summary.age.mean} 歲`)
             ].join('');
-            document.getElementById('summaryPlotWrap').innerHTML = `<img class="max-w-full" src="data:image/png;base64,${plot}" alt="summary">`;
-            document.getElementById('timelinePreviewWrap').innerHTML = `<img class="max-w-full" src="data:image/png;base64,${timelinePreview}" alt="timeline preview">`;
+            document.getElementById('summaryPlotWrap').innerHTML = `<img class="max-h-[260px] mx-auto rounded" src="data:image/png;base64,${plot}" alt="summary">`;
+            document.getElementById('timelinePreviewWrap').innerHTML = `<img class="max-h-[260px] mx-auto rounded" src="data:image/png;base64,${timelinePreview}" alt="timeline preview">`;
         }
 
-        document.getElementById('trainBtn').onclick = async () => {
-            const log = document.getElementById('trainLog');
-            const progress = document.getElementById('progressBar');
-            log.textContent = '開始訓練...\n';
-            progress.style.width = '20%';
-            let progressValue = 20;
-            const progressTimer = setInterval(() => {
-                progressValue = Math.min(85, progressValue + 5);
-                progress.style.width = `${progressValue}%`;
-            }, 1000);
-            const res = await fetch('/api/train', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    epochs: document.getElementById('epochs').value,
-                    retail_epochs: document.getElementById('retailEpochs').value,
-                    diff_epochs: document.getElementById('diffEpochs').value,
-                    lr: document.getElementById('lr').value
-                })
-            });
-            clearInterval(progressTimer);
-            progress.style.width = '80%';
-            const result = await res.json();
-            if (result.status !== 'success') {
-                log.textContent += result.message || '訓練失敗。';
-                progress.style.width = '0%';
+        // Global status checkpoints reload
+        async function checkDbStatus() {
+            try {
+                const res = await fetch('/api/db_status');
+                const data = await res.json();
+                if (data.status === 'success') {
+                    // Update state variables
+                    state.uploaded = data.records_count > 0;
+                    state.mappingStatus = data.mapping_status;
+                    
+                    // Update status checkpoints panel
+                    const statusVal = document.getElementById('chkDataStatusVal');
+                    const statusNum = document.getElementById('chkDataStatusNum');
+                    const statusWrap = document.getElementById('chkDataStatus');
+                    statusVal.textContent = `${data.records_count} 病患 | ${data.stores_count} 超商`;
+                    if (data.records_count > 0 && data.stores_count > 0) {
+                        statusNum.className = "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-green-100 text-green-700";
+                        statusWrap.className = "bg-white border p-3 rounded-lg shadow-sm flex items-center gap-3 border-green-200";
+                    } else {
+                        statusNum.className = "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-red-100 text-red-700";
+                        statusWrap.className = "bg-white border p-3 rounded-lg shadow-sm flex items-center gap-3 border-red-200";
+                    }
+                    
+                    // Checkpoint 3: Mapping status
+                    const mapVal = document.getElementById('chkMappingVal');
+                    const mapNum = document.getElementById('chkMappingNum');
+                    const mapWrap = document.getElementById('chkMapping');
+                    const mapBtn = document.getElementById('chkMappingBtn');
+                    
+                    if (data.mapping_status === 'assigned') {
+                        mapVal.textContent = "已分配 (亮綠燈)";
+                        mapVal.className = "text-green-600 font-semibold";
+                        mapNum.className = "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-green-100 text-green-700";
+                        mapWrap.className = "bg-white border p-3 rounded-lg shadow-sm flex items-center gap-3 border-green-200";
+                        mapBtn.classList.add('hidden');
+                    } else {
+                        mapVal.textContent = "未分配 (亮紅燈)";
+                        mapVal.className = "text-rose-600 font-semibold";
+                        mapNum.className = "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-red-100 text-red-700";
+                        mapWrap.className = "bg-white border p-3 rounded-lg shadow-sm flex items-center gap-3 border-red-200";
+                        if (data.records_count > 0 && data.stores_count > 0) {
+                            mapBtn.classList.remove('hidden');
+                        } else {
+                            mapBtn.classList.add('hidden');
+                        }
+                    }
+                    
+                    // Checkpoint 4: Model Status
+                    const modelVal = document.getElementById('chkModelVal');
+                    const modelNum = document.getElementById('chkModelNum');
+                    const modelWrap = document.getElementById('chkModel');
+                    if (data.active_model_id) {
+                        state.trained = true;
+                        modelVal.textContent = `已載入: ${data.active_model_id}`;
+                        modelNum.className = "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-green-100 text-green-700";
+                        modelWrap.className = "bg-white border p-3 rounded-lg shadow-sm flex items-center gap-3 border-green-200";
+                    } else {
+                        state.trained = false;
+                        modelVal.textContent = "未載入任何模型";
+                        modelNum.className = "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-red-100 text-red-700";
+                        modelWrap.className = "bg-white border p-3 rounded-lg shadow-sm flex items-center gap-3 border-red-200";
+                    }
+                    
+                    setUnlocked();
+                    
+                    // Update main panel load text
+                    if (data.records_count > 0) {
+                        document.getElementById('uploadStatus').innerHTML = `SQLite [${data.active_db}] 已載入 <strong class="text-slate-900">${data.records_count}</strong> 筆病患紀錄`;
+                    } else {
+                        document.getElementById('uploadStatus').textContent = '資料庫無紀錄，請先上傳 CSV 資料檔';
+                    }
+                    
+                    // Update stores loader text
+                    const fetchStatus = document.getElementById('fetchStoresStatus');
+                    fetchStatus.innerHTML = `目前資料庫內有：<strong class="text-slate-900">${data.stores_count}</strong> 筆超商資料`;
+                    
+                    // Trigger store reload from active SQLite
+                    const resStores = await fetch('/api/convenience_stores');
+                    const dataStores = await resStores.json();
+                    renderStoresList(dataStores.stores);
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Random Assignment Button Click inside Status checkpoints bar
+        document.getElementById('chkMappingBtn').onclick = async () => {
+            const btn = document.getElementById('chkMappingBtn');
+            btn.disabled = true;
+            btn.textContent = '分配中...';
+            try {
+                const res = await fetch('/api/records/assign_stores', { method: 'POST' });
+                const result = await res.json();
+                if (result.status === 'success') {
+                    showToast(result.message, true)
+                    await checkDbStatus();
+                    loadDbRecords();
+                } else {
+                    showToast('分配失敗：' + result.message, true)
+                }
+            } catch (err) {
+                showToast('分配連線錯誤：' + err.message, true)
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '隨機分配';
+            }
+        };
+
+        // --- Tab 1.2: Leaflet Store Map and Convenience Stores CRUD ---
+        let storeMap = null;
+        let storeMapMarkers = [];
+
+        function initStoreMap() {
+            if (storeMap) return;
+            storeMap = L.map('storeMap').setView([22.9972, 120.2185], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(storeMap);
+        }
+
+        function renderStoresList(stores) {
+            const listContainer = document.getElementById('storesList');
+            if (!stores || stores.length === 0) {
+                listContainer.innerHTML = `<div class="p-3 text-center text-slate-400 text-xs">目前無超商數據。請在上方獲取或手動新增。</div>`;
                 return;
             }
-            progress.style.width = '100%';
-            log.textContent = result.logs.join('\n');
-            state.trained = true;
-            state.testUids = result.test_uids;
-            setUnlocked();
-            renderMetrics(result.metrics);
-            if (result.model_analysis_plot) {
-                document.getElementById('modelAnalysisPlotWrap').innerHTML = `<img class="max-w-full" src="data:image/png;base64,${result.model_analysis_plot}" alt="model analysis">`;
+            listContainer.innerHTML = stores.map((s, idx) => `
+                <div onclick='selectStore(${JSON.stringify(s)})' class="p-3 hover:bg-slate-50 cursor-pointer text-xs transition-colors flex justify-between items-center border-l-4 border-transparent hover:border-slate-800">
+                    <div>
+                        <div class="font-bold text-slate-800">${s.name}</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">${s.address}</div>
+                    </div>
+                    <span class="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-mono">(${s.lat.toFixed(3)}, ${s.lon.toFixed(3)})</span>
+                </div>
+            `).join('');
+            
+            if (stores.length > 0 && storeMap) {
+                setTimeout(() => selectStore(stores[0]), 300);
             }
-            await loadResults();
-            showTab('result');
+        }
+
+        async function selectStore(store) {
+            document.getElementById('editStoreOsmId').value = store.osm_id;
+            document.getElementById('editStoreName').value = store.name;
+            document.getElementById('editStoreNameEn').value = store.name_en;
+            document.getElementById('editStoreAddress').value = store.address;
+            document.getElementById('editStoreAddressEn').value = store.address_en;
+            document.getElementById('editStoreLat').value = store.lat;
+            document.getElementById('editStoreLon').value = store.lon;
+            document.getElementById('storeEditPanel').classList.remove('hidden');
+
+            initStoreMap();
+            
+            storeMapMarkers.forEach(m => storeMap.removeLayer(m));
+            storeMapMarkers = [];
+            
+            storeMap.setView([store.lat, store.lon], 14);
+            
+            const storeMarker = L.marker([store.lat, store.lon]).addTo(storeMap)
+                .bindPopup(`<b>${store.name}</b><br>${store.address}`)
+                .openPopup();
+            storeMapMarkers.push(storeMarker);
+            
+            try {
+                const res = await fetch(`/api/stores/${store.osm_id}/clients`);
+                const result = await res.json();
+                if (result.status === 'success' && result.clients.length) {
+                    const clientCoords = [];
+                    result.clients.forEach(c => {
+                        const clientIcon = L.icon({
+                            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+                            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                            iconSize: [25, 41],
+                            iconAnchor: [12, 41],
+                            popupAnchor: [1, -34],
+                            shadowSize: [41, 41]
+                        });
+                        
+                        const cMarker = L.marker([c.client_lat, c.client_lon], { icon: clientIcon }).addTo(storeMap)
+                            .bindPopup(`病患: ${c.client_id}`);
+                        storeMapMarkers.push(cMarker);
+                        clientCoords.push([c.client_lat, c.client_lon]);
+                    });
+                    
+                    const bounds = L.latLngBounds([[store.lat, store.lon], ...clientCoords]);
+                    storeMap.fitBounds(bounds, { padding: [40, 40] });
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Store Save / Delete
+        document.getElementById('saveStoreBtn').onclick = async () => {
+            const body = {
+                osm_id: document.getElementById('editStoreOsmId').value,
+                name: document.getElementById('editStoreName').value.trim(),
+                name_en: document.getElementById('editStoreNameEn').value.trim(),
+                address: document.getElementById('editStoreAddress').value.trim(),
+                address_en: document.getElementById('editStoreAddressEn').value.trim(),
+                lat: parseFloat(document.getElementById('editStoreLat').value),
+                lon: parseFloat(document.getElementById('editStoreLon').value)
+            };
+
+            if (!body.osm_id || !body.name) {
+                showToast('店名與店面識別符為必填', true)
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/stores/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const result = await res.json();
+                if (result.status === 'success') {
+                    showToast('超商資訊修改成功！', true)
+                    checkDbStatus();
+                } else {
+                    showToast('修改失敗：' + result.message, true)
+                }
+            } catch (err) {
+                showToast('請求錯誤：' + err.message, true)
+            }
+        };
+
+        document.getElementById('deleteStoreBtn').onclick = async () => {
+            const osmId = document.getElementById('editStoreOsmId').value;
+            if (!osmId) return;
+            if (!confirm("確定要刪除這家超商門市嗎？")) return;
+
+            try {
+                const res = await fetch('/api/stores/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ osm_id: osmId })
+                });
+                const result = await res.json();
+                if (result.status === 'success') {
+                    document.getElementById('storeEditPanel').classList.add('hidden');
+                    checkDbStatus();
+                } else {
+                    showToast('刪除失敗：' + result.message, true)
+                }
+            } catch (err) {
+                showToast('請求錯誤：' + err.message, true)
+            }
+        };
+
+        document.getElementById('addStoreBtn').onclick = async () => {
+            const name = prompt("請輸入新超商門市名稱：", "7-11 科技門市");
+            if (!name) return;
+            
+            try {
+                const res = await fetch('/api/stores/add', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: name,
+                        address: "台南市東區大學路",
+                        name_en: "7-11 Tech Store",
+                        address_en: "Daxue Rd., East Dist., Tainan City",
+                        lat: 22.997,
+                        lon: 120.218
+                    })
+                });
+                const result = await res.json();
+                if (result.status === 'success') {
+                    checkDbStatus();
+                } else {
+                    showToast('新增超商失敗：' + result.message, true)
+                }
+            } catch (err) {
+                showToast('請求錯誤：' + err.message, true)
+            }
+        };
+
+        // Fetch stores from OSM tool trigger
+        document.getElementById('fetchStoresBtn').onclick = async () => {
+            const limitInput = document.getElementById('storeLimitInput');
+            const statusText = document.getElementById('fetchStoresStatus');
+            const btn = document.getElementById('fetchStoresBtn');
+            
+            const limit = parseInt(limitInput.value);
+            if (isNaN(limit) || limit < 10 || limit > 500) {
+                showToast('請輸入 10 到 500 之間的數量。', true)
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.textContent = '獲取中...請稍候';
+            statusText.textContent = '正在從 OpenStreetMap API 獲取超商資料 (需時約十多秒，請勿重新整理)...';
+            
+            try {
+                const res = await fetch('/api/fetch_stores', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ limit: limit })
+                });
+                const result = await res.json();
+                if (result.status === 'success') {
+                    statusText.innerHTML = `成功獲取並儲存 <strong class="text-green-600">${result.count}</strong> 筆超商資料！`;
+                    limitInput.value = result.count;
+                } else {
+                    statusText.innerHTML = `<span class="text-red-600">失敗：${result.message || '無法獲取資料'}</span>`;
+                }
+            } catch (err) {
+                statusText.innerHTML = `<span class="text-red-600">請求錯誤：${err.message}</span>`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '獲取並存入資料庫';
+                setTimeout(checkDbStatus, 2000);
+            }
+        };
+
+        // --- Tab 2: Model Checkpoint Manager & Loss Curves ---
+        async function loadModelsList() {
+            const tableBody = document.getElementById('modelsTableBody');
+            try {
+                const res = await fetch('/api/models');
+                const result = await res.json();
+                if (result.status !== 'success') return;
+                
+                state.activeModelId = result.active_model_id;
+                
+                if (!result.models || result.models.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400 text-xs">尚無任何已存的模型版本</td></tr>`;
+                    return;
+                }
+                
+                tableBody.innerHTML = result.models.map(m => `
+                    <tr class="${m.active ? 'bg-slate-100/50 font-semibold' : ''} hover:bg-slate-50 border-b border-slate-100">
+                        <td class="p-3 font-mono text-slate-700">${m.model_id}</td>
+                        <td class="p-3 text-slate-500 font-bold">${m.db_name ? m.db_name + '.db' : 'default.db'}</td>
+                        <td class="p-3 text-slate-500">${m.timestamp}</td>
+                        <td class="p-3 font-bold">${m.metrics ? m.metrics.day_mae : '-'} 天</td>
+                        <td class="p-3 text-center">
+                            ${m.active ? 
+                                `<span class="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded font-bold">已載入</span>` : 
+                                `<span class="text-[10px] bg-slate-100 text-slate-400 px-2 py-0.5 rounded">未載入</span>`}
+                        </td>
+                        <td class="p-3 text-right space-x-1.5">
+                            ${m.active ? '' : `<button onclick="activateModel('${m.model_id}')" class="text-blue-600 hover:text-blue-900 font-semibold bg-white border border-blue-100 hover:border-blue-300 px-2.5 py-1 rounded">載入</button>`}
+                            <button onclick="deleteModel('${m.model_id}')" class="text-red-600 hover:text-red-900 font-semibold bg-white border border-red-100 hover:border-red-300 px-2.5 py-1 rounded">刪除</button>
+                            <button onclick='previewModelDetail(${JSON.stringify(m)})' class="text-slate-600 hover:text-slate-900 font-semibold bg-white border border-slate-200 px-2.5 py-1 rounded">詳情</button>
+                        </td>
+                    </tr>
+                `).join('');
+                
+                const activeModel = result.models.find(m => m.active);
+                if (activeModel && activeModel.metrics) {
+                    state.modelMae = activeModel.metrics.day_mae;
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function activateModel(modelId) {
+            try {
+                const res = await fetch('/api/models/active', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model_id: modelId })
+                });
+                const result = await res.json();
+                if (result.status === 'success') {
+                    showToast(`成功載入模型版本 ${modelId}，系統已切換至關聯之資料庫專案 [${result.active_db}.db]！`, false)
+                    state.trained = true;
+                    
+                    await loadDatabasesList();
+                    await checkDbStatus();
+                    await loadDbRecords();
+                    await loadModelsList();
+                    await loadResults();
+                } else {
+                    showToast('載入失敗：' + result.message, true)
+                }
+            } catch (err) {
+                showToast('載入發生錯誤：' + err.message, true)
+            }
+        }
+
+        async function deleteModel(modelId) {
+            if (!confirm(`確定要永久刪除模型版本 ${modelId} 嗎？`)) return;
+            try {
+                const res = await fetch(`/api/models/${modelId}`, { method: 'DELETE' });
+                const result = await res.json();
+                if (result.status === 'success') {
+                    loadModelsList();
+                    document.getElementById('selectedModelDetail').classList.add('hidden');
+                } else {
+                    showToast('刪除失敗：' + result.message, true)
+                }
+            } catch (err) {
+                showToast('刪除發生錯誤：' + err.message, true)
+            }
+        }
+
+        function previewModelDetail(meta) {
+            document.getElementById('detailEpochs').textContent = meta.epochs + ' 輪';
+            document.getElementById('detailNnEpochs').textContent = meta.retail_epochs + ' 輪';
+            document.getElementById('detailDiffEpochs').textContent = meta.diff_epochs + ' 輪';
+            document.getElementById('detailLr').textContent = meta.lr;
+            
+            document.getElementById('trainLog').textContent = meta.logs.join('\n');
+            document.getElementById('selectedModelDetail').classList.remove('hidden');
+            
+            renderLossCurveChart(meta.logs);
+        }
+
+        function renderLossCurveChart(logs) {
+            const lstmEpochs = [];
+            const lstmLosses = [];
+            const nnEpochs = [];
+            const nnLosses = [];
+            const diffEpochs = [];
+            const diffLosses = [];
+            
+            logs.forEach(log => {
+                const lstmMatch = log.match(/LSTM epoch (\d+)\/\d+: loss=([\d\.]+)/);
+                if (lstmMatch) {
+                    lstmEpochs.push(parseInt(lstmMatch[1]));
+                    lstmLosses.push(parseFloat(lstmMatch[2]));
+                }
+                const nnMatch = log.match(/Retail NN epoch (\d+)\/\d+: loss=([\d\.]+)/);
+                if (nnMatch) {
+                    nnEpochs.push(parseInt(nnMatch[1]));
+                    nnLosses.push(parseFloat(nnMatch[2]));
+                }
+                const diffMatch = log.match(/Diffusion epoch (\d+)\/\d+: loss=([\d\.]+)/);
+                if (diffMatch) {
+                    diffEpochs.push(parseInt(diffMatch[1]));
+                    diffLosses.push(parseFloat(diffMatch[2]));
+                }
+            });
+            
+            if (lstmLosses.length === 0 && nnLosses.length === 0 && diffLosses.length === 0) {
+                lossChart.clear();
+                return;
+            }
+            
+            const maxEpoch = Math.max(lstmEpochs.length, nnEpochs.length, diffEpochs.length);
+            const xAxisData = Array.from({length: maxEpoch}, (_, i) => i + 1);
+            
+            lossChart.setOption({
+                tooltip: { trigger: 'axis' },
+                legend: { data: ['LSTM Visit Loss', 'Retail NN Loss', 'Diffusion Loss'] },
+                grid: { top: 40, bottom: 30, left: 40, right: 20 },
+                xAxis: { type: 'category', data: xAxisData, name: 'Epoch' },
+                yAxis: { type: 'value', name: 'Loss' },
+                series: [
+                    { name: 'LSTM Visit Loss', type: 'line', data: lstmLosses, smooth: true, itemStyle: { color: '#0f172a' } },
+                    { name: 'Retail NN Loss', type: 'line', data: nnLosses, smooth: true, itemStyle: { color: '#64748b' } },
+                    { name: 'Diffusion Loss', type: 'line', data: diffLosses, smooth: true, itemStyle: { color: '#0f766e' } }
+                ]
+            });
+            lossChart.resize();
+        }
+
+        // Train Model execution
+        document.getElementById('trainBtn').onclick = async () => {
+            if (!confirm("確定要開始模型訓練嗎？這將花費數十秒至數分鐘。")) return;
+            
+            const log = document.getElementById('trainLog');
+            const progress = document.getElementById('progressBar');
+            const btn = document.getElementById('trainBtn');
+            
+            btn.disabled = true;
+            btn.textContent = '模型訓練中...請稍候';
+            log.textContent = '初始化 LSTM + Diffusion 模型訓練...\n';
+            progress.style.width = '15%';
+            
+            let progressValue = 15;
+            const progressTimer = setInterval(() => {
+                progressValue = Math.min(88, progressValue + 3);
+                progress.style.width = `${progressValue}%`;
+            }, 1500);
+            
+            try {
+                const res = await fetch('/api/train', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        epochs: document.getElementById('epochs').value,
+                        retail_epochs: document.getElementById('retailEpochs').value,
+                        diff_epochs: document.getElementById('diffEpochs').value,
+                        lr: document.getElementById('lr').value
+                    })
+                });
+                
+                clearInterval(progressTimer);
+                progress.style.width = '90%';
+                
+                const result = await res.json();
+                if (result.status !== 'success') {
+                    log.textContent += result.message || '訓練失敗。';
+                    progress.style.width = '0%';
+                    btn.disabled = false;
+                    btn.textContent = '開始訓練模型';
+                    return;
+                }
+                
+                progress.style.width = '100%';
+                log.textContent = result.logs.join('\n');
+                state.trained = true;
+                state.testUids = result.test_uids;
+                state.activeModelId = result.active_model_id;
+                state.modelMae = result.metrics.day_mae;
+                
+                await checkDbStatus();
+                renderMetrics(result.metrics);
+                
+                if (result.model_analysis_plot) {
+                    document.getElementById('modelAnalysisPlotWrap').innerHTML = `<img class="max-w-full rounded" src="data:image/png;base64,${result.model_analysis_plot}" alt="model analysis">`;
+                }
+                
+                loadModelsList();
+                
+                document.getElementById('selectedModelDetail').classList.remove('hidden');
+                document.getElementById('detailEpochs').textContent = document.getElementById('epochs').value + ' 輪';
+                document.getElementById('detailNnEpochs').textContent = document.getElementById('retailEpochs').value + ' 輪';
+                document.getElementById('detailDiffEpochs').textContent = document.getElementById('diffEpochs').value + ' 輪';
+                document.getElementById('detailLr').textContent = document.getElementById('lr').value;
+                renderLossCurveChart(result.logs);
+                
+                await loadResults();
+                showToast('模型訓練與存檔完成，已自動載入新模型！', true)
+                showSection('result');
+            } catch (err) {
+                clearInterval(progressTimer);
+                progress.style.width = '0%';
+                log.textContent += '\n連線錯誤：' + err.message;
+                btn.disabled = false;
+                btn.textContent = '開始訓練模型';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '開始訓練模型';
+            }
         };
 
         function renderMetrics(metrics) {
             document.getElementById('modelMetrics').innerHTML = [
-                metricCard('回訪天數 MAE', metrics.day_mae),
-                metricCard('藥品 Recall', `${(metrics.med_recall * 100).toFixed(1)}%`),
+                metricCard('回訪天數預測 MAE', `${metrics.day_mae} 天`),
+                metricCard('用藥品項 Recall', `${(metrics.med_recall * 100).toFixed(1)}%`),
                 metricCard('商品 Top-4 Recall', `${(metrics.retail_recall * 100).toFixed(1)}%`),
-                metricCard('評估筆數', metrics.evaluated_rows)
+                metricCard('評估測試筆數', `${metrics.evaluated_rows} 筆`)
             ].join('');
         }
 
-        async function loadResults() {
-            const res = await fetch('/api/results');
-            const result = await res.json();
-            if (result.status !== 'success') return;
-            renderMetrics(result.metrics);
-            renderTable(result.rows.slice(0, 30));
-            const select = document.getElementById('patientSelect');
-            const futureSelect = document.getElementById('futurePatientSelect');
-            const uids = [...new Set(result.rows.map(row => row.client_id))];
-            select.innerHTML = uids.map(uid => `<option value="${uid}">${uid}</option>`).join('');
-            futureSelect.innerHTML = `<option value="all">所有使用者</option>` + uids.map(uid => `<option value="${uid}">${uid}</option>`).join('');
-            select.onchange = () => loadPatient(select.value);
-            if (uids.length) await loadPatient(uids[0]);
+        // --- Tab 3: Results Dashboard & Time Formatting ---
+        let resultsPatientMap = null;
+        let resultsMarkers = [];
+
+        function initResultsPatientMap() {
+            if (resultsPatientMap) return;
+            resultsPatientMap = L.map('resultsPatientMap').setView([22.9972, 120.2185], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(resultsPatientMap);
         }
 
-        function renderTable(rows) {
-            document.getElementById('resultTable').innerHTML = rows.map(row => `
-                <tr class="border-b border-slate-100 hover:bg-slate-50">
-                    <td class="py-2 font-semibold">${row.client_id}</td>
-                    <td>${formatDay(row.target_pharmacy_day)}</td>
-                    <td>${formatDay(row.predicted_pharmacy_day)}</td>
-                    <td>${formatDelta(row.day_delta)}</td>
-                    <td>${renderPills(row.true_meds)}</td>
-                    <td>${renderPills(row.predicted_meds)}</td>
-                    <td>${renderPills(row.true_products)}</td>
-                    <td>${renderPills(row.recommended_products)}</td>
-                    <td>${((row.retail_recall || 0) * 100).toFixed(0)}%</td>
-                </tr>
-            `).join('');
+        async function loadResults() {
+            try {
+                const res = await fetch('/api/results');
+                const result = await res.json();
+                if (result.status !== 'success') return;
+                
+                renderMetrics(result.metrics);
+                renderResultsTable(result.rows.slice(0, 50));
+                
+                const select = document.getElementById('patientSelect');
+                const futureSelect = document.getElementById('futurePatientSelect');
+                
+                const uids = [...new Set(result.rows.map(row => row.client_id))];
+                select.innerHTML = uids.map(uid => `<option value="${uid}">${uid}</option>`).join('');
+                futureSelect.innerHTML = `<option value="all">所有病患 (All)</option>` + uids.map(uid => `<option value="${uid}">${uid}</option>`).join('');
+                
+                select.onchange = () => loadPatientData(select.value);
+                if (uids.length) {
+                    await loadPatientData(uids[0]);
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function renderResultsTable(rows) {
+            const table = document.getElementById('resultTable');
+            table.innerHTML = rows.map(row => {
+                // Results tab uses fixed starting date '2026-07-06'
+                const actualDate = dayToDate(row.target_pharmacy_day, false);
+                const predictedDate = dayToDate(row.predicted_pharmacy_day, false);
+                const actualErr = Math.round(row.predicted_gap - row.actual_gap);
+                const actualErrText = actualErr > 0 ? `+${actualErr}d` : `${actualErr}d`;
+                const actualErrColor = Math.abs(actualErr) <= 3 ? 'text-green-600' : 'text-rose-600';
+                
+                return `
+                    <tr class="hover:bg-slate-50 border-b border-slate-100">
+                        <td class="font-semibold text-slate-800 py-3">${row.client_id}</td>
+                        <td>
+                            <div class="font-medium text-slate-800">${row.store_name}</div>
+                            <div class="text-[10px] text-slate-400">${row.store_address}</div>
+                        </td>
+                        <td>
+                            <div>${actualDate}</div>
+                            <div class="text-[10px] text-slate-400 font-mono">Day ${row.target_pharmacy_day}</div>
+                        </td>
+                        <td>
+                            <div>${predictedDate}</div>
+                            <div class="text-[10px] text-slate-400 font-mono">Day ${row.predicted_pharmacy_day}</div>
+                        </td>
+                        <td>${row.predicted_days_later} 天後</td>
+                        <td class="text-slate-500 font-mono">± ${state.modelMae.toFixed(1)}d</td>
+                        <td class="${actualErrColor} font-bold font-mono">${actualErrText}</td>
+                        <td>${renderPills(row.predicted_meds)}</td>
+                        <td>${renderPills(row.recommended_products)}</td>
+                        <td class="font-bold text-slate-800">${((row.retail_recall || 0) * 100).toFixed(0)}%</td>
+                    </tr>
+                `;
+            }).join('');
         }
 
         function renderPills(value) {
             return String(value || '').split('|').filter(Boolean).map(item => `<span class="pill">${item}</span>`).join('');
         }
 
-        function formatDay(day) {
-            const value = Math.round(Number(day));
-            return `${value} d / M${Math.round(value / 30)}`;
-        }
-
-        function formatDelta(delta) {
-            const value = Math.round(Number(delta || 0));
-            const sign = value > 0 ? '+' : '';
-            return `${sign}${value} d`;
-        }
-
-        async function loadPatient(uid) {
-            const res = await fetch(`/api/patient/${uid}`);
-            const result = await res.json();
-            if (result.status !== 'success') return;
-            renderPatientInfo(result);
-            renderVisitChart(result);
-            renderRetailChart(result.predictions);
-            const plotRes = await fetch(`/api/model_analysis_plot/${uid}`);
-            const plotResult = await plotRes.json();
-            if (plotResult.status === 'success') {
-                document.getElementById('modelAnalysisPlotWrap').innerHTML = `<img class="max-w-full" src="data:image/png;base64,${plotResult.plot}" alt="model analysis">`;
+        async function loadPatientData(uid) {
+            try {
+                const res = await fetch(`/api/patient/${uid}`);
+                const result = await res.json();
+                if (result.status !== 'success') return;
+                
+                renderPatientInfoPanel(result);
+                renderPatientCharts(result);
+                
+                // Show patient coordinates on results map
+                drawPatientCoordinatesOnMap(resultsPatientMap, resultsMarkers, result.uid);
+                
+                const plotRes = await fetch(`/api/model_analysis_plot/${uid}`);
+                const plotResult = await plotRes.json();
+                if (plotResult.status === 'success') {
+                    document.getElementById('modelAnalysisPlotWrap').innerHTML = `<img class="max-w-full rounded" src="data:image/png;base64,${plotResult.plot}" alt="model analysis">`;
+                }
+            } catch (err) {
+                console.error(err);
             }
         }
 
-        function renderPatientInfo(data) {
+        async function drawPatientCoordinatesOnMap(mapInstance, markerArray, clientId) {
+            if (!mapInstance) return;
+            
+            // Get patient client locations
+            try {
+                const res = await fetch(`/api/records?page=1&limit=1&search=${clientId}`);
+                const result = await res.json();
+                if (result.status === 'success' && result.records.length) {
+                    const r = result.records[0];
+                    
+                    // Clear previous markers
+                    markerArray.forEach(m => mapInstance.removeLayer(m));
+                    markerArray.length = 0;
+                    
+                    if (r.client_lat && r.client_lon) {
+                        mapInstance.setView([r.client_lat, r.client_lon], 14);
+                        
+                        // Client Red marker
+                        const clientIcon = L.icon({
+                            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+                            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                            iconSize: [25, 41],
+                            iconAnchor: [12, 41],
+                            popupAnchor: [1, -34],
+                            shadowSize: [41, 41]
+                        });
+                        const clientMarker = L.marker([r.client_lat, r.client_lon], { icon: clientIcon })
+                            .addTo(mapInstance).bindPopup(`<b>病患: ${r.client_id} (住址)</b>`);
+                        markerArray.push(clientMarker);
+                        
+                        // Assigned store marker
+                        const storeMarker = L.marker([r.store_lat, r.store_lon])
+                            .addTo(mapInstance).bindPopup(`<b>分配超商: ${r.store_name}</b><br>${r.store_address}`);
+                        markerArray.push(storeMarker);
+                        
+                        // Dashed link line
+                        const polyline = L.polyline([[r.client_lat, r.client_lon], [r.store_lat, r.store_lon]], {
+                            color: '#475569',
+                            weight: 3,
+                            dashArray: '5, 10'
+                        }).addTo(mapInstance);
+                        markerArray.push(polyline);
+                        
+                        const bounds = L.latLngBounds([[r.client_lat, r.client_lon], [r.store_lat, r.store_lon]]);
+                        mapInstance.fitBounds(bounds, { padding: [40, 40] });
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function renderPatientInfoPanel(data) {
             document.getElementById('patientInfoCards').innerHTML = [
-                metricCard('使用者', data.uid),
-                metricCard('年齡', data.age),
-                metricCard('疾病', data.disease),
-                `<div class="border border-slate-200 bg-slate-50 p-4"><div class="text-xs text-slate-500">目前藥品</div><div class="mt-2">${(data.current_meds || []).map(med => `<span class="pill">${med}</span>`).join('')}</div></div>`
+                metricCard('目前分析病患', data.uid),
+                metricCard('病患年齡', `${data.age} 歲`),
+                metricCard('疾病類別', data.disease),
+                `<div class="border border-slate-100 bg-slate-50/50 p-3 rounded-lg"><div class="text-[10px] text-slate-400 font-bold">目前處方藥品</div><div class="mt-1.5">${(data.current_meds || []).map(med => `<span class="pill">${med}</span>`).join('')}</div></div>`
             ].join('');
         }
 
-        function renderVisitChart(data) {
+        function renderPatientCharts(data) {
             const firstTarget = Math.min(...data.predictions.map(row => row.target_pharmacy_day));
             const historyStart = Math.max(0, firstTarget - 420);
             const timeline = data.timeline.filter(row => row.pharmacy_report_day >= historyStart);
-            const visits = timeline.map(row => [row.pharmacy_report_day, 'Observed pharmacy visit']);
-            const doctors = timeline.map(row => [row.doctor_visit_day, 'Hidden doctor visit']);
-            const actual = data.predictions.map(row => [row.target_pharmacy_day, 'Actual next visit']);
-            const predicted = data.predictions.map(row => [row.predicted_pharmacy_day, 'Predicted next visit']);
-            const allDays = [...visits, ...doctors, ...actual, ...predicted].map(item => item[0]);
+            
+            // Results tab uses fixed starting date '2026-07-06'
+            const visits = timeline.map(row => [dayToDate(row.pharmacy_report_day, false), 'Observed pharmacy visit']);
+            const doctors = timeline.map(row => [dayToDate(row.doctor_visit_day, false), 'Hidden doctor visit']);
+            const actual = data.predictions.map(row => [dayToDate(row.target_pharmacy_day, false), 'Actual next visit']);
+            const predicted = data.predictions.map(row => [dayToDate(row.predicted_pharmacy_day, false), 'Predicted next visit']);
+            
             visitChart.setOption({
                 tooltip: { trigger: 'item' },
-                grid: { left: 140, right: 30, top: 30, bottom: 45 },
+                legend: { data: ['Observed pharmacy visit', 'Hidden doctor visit', 'Actual next visit', 'Predicted next visit'] },
+                grid: { left: 140, right: 30, top: 40, bottom: 45 },
                 xAxis: {
-                    type: 'value',
-                    name: 'month',
-                    min: Math.max(0, Math.min(...allDays) - 30),
-                    max: Math.max(...allDays) + 30,
-                    axisLabel: { formatter: value => `M${(value / 30).toFixed(0)}` }
+                    type: 'time',
+                    name: 'Date',
+                    axisLabel: { formatter: '{yyyy}-{MM}-{dd}', rotate: 30, hideOverlap: true },
+                    splitNumber: 6
                 },
                 yAxis: { type: 'category', data: ['Predicted next visit', 'Actual next visit', 'Hidden doctor visit', 'Observed pharmacy visit'] },
                 series: [
-                    { type: 'scatter', name: 'Observed pharmacy visit', data: visits, symbolSize: 10, itemStyle: { color: '#334155' } },
+                    { type: 'scatter', name: 'Observed pharmacy visit', data: visits, symbolSize: 10, itemStyle: { color: '#0f172a' } },
                     { type: 'scatter', name: 'Hidden doctor visit', data: doctors, symbolSize: 8, itemStyle: { color: '#94a3b8' } },
                     { type: 'scatter', name: 'Actual next visit', data: actual, symbolSize: 14, itemStyle: { color: '#16a34a' } },
-                    { type: 'scatter', name: 'Predicted next visit', data: predicted, symbolSize: 14, itemStyle: { color: '#dc2626' } }
+                    { type: 'scatter', name: 'Predicted next visit', data: predicted, symbolSize: 14, itemStyle: { color: '#e11d48' } }
                 ]
             });
-        }
-
-        function renderRetailChart(predictions) {
-            const rows = predictions.slice(-8);
+            
+            const rows = data.predictions.slice(-8);
             retailChart.setOption({
                 tooltip: { trigger: 'axis' },
-                grid: { left: 50, right: 30, top: 30, bottom: 80 },
-                xAxis: { type: 'category', data: rows.map(row => `M${(row.target_pharmacy_day / 30).toFixed(1)}`), axisLabel: { rotate: 35 } },
+                grid: { left: 50, right: 30, top: 40, bottom: 80 },
+                // Results tab uses fixed starting date '2026-07-06'
+                xAxis: { type: 'category', data: rows.map(row => dayToDate(row.target_pharmacy_day, false)), axisLabel: { rotate: 35 } },
                 yAxis: { type: 'value', min: 0, max: 1 },
                 series: [{
                     type: 'bar',
                     name: 'Retail Top-4 Recall',
                     data: rows.map(row => row.retail_recall),
-                    itemStyle: { color: '#111827' },
+                    itemStyle: { color: '#0f172a' },
                     label: { show: true, position: 'top', formatter: params => `${(params.value * 100).toFixed(0)}%` }
                 }]
             });
         }
 
-        window.addEventListener('resize', () => {
-            visitChart.resize();
-            retailChart.resize();
-            futureChart.resize();
-        });
-        
+        // --- Tab 5: Long-term Future Forecast ---
+        let futurePatientMap = null;
+        let futureMarkers = [];
+
+        function initFuturePatientMap() {
+            if (futurePatientMap) return;
+            futurePatientMap = L.map('futurePatientMap').setView([22.9972, 120.2185], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(futurePatientMap);
+        }
+
         document.getElementById('futureBtn').onclick = loadFutureForecast;
+        document.getElementById('downloadFutureBtn').onclick = () => {
+            const uid = document.getElementById('futurePatientSelect').value || 'all';
+            const days = document.getElementById('futureDays').value || 180;
+            const lang = document.getElementById('downloadLangSelect').value;
+            const baseDate = document.getElementById('baseDateInput').value || '2026-07-06';
+            window.location.href = `/api/download_future_forecast?uid=${encodeURIComponent(uid)}&days=${encodeURIComponent(days)}&lang=${lang}&base_date=${encodeURIComponent(baseDate)}`;
+        };
+
+        // Select changes in Future Patients select will trigger coordinate redraw and patient forecast reload
+        document.getElementById('futurePatientSelect').onchange = () => {
+            const uid = document.getElementById('futurePatientSelect').value;
+            if (uid && uid !== 'all') {
+                drawPatientCoordinatesOnMap(futurePatientMap, futureMarkers, uid);
+            }
+            loadFutureForecast();
+        };
 
         async function loadFutureForecast() {
             const uid = document.getElementById('futurePatientSelect').value || 'all';
             const days = document.getElementById('futureDays').value || 180;
-            const res = await fetch(`/api/future_forecast?uid=${encodeURIComponent(uid)}&days=${encodeURIComponent(days)}`);
-            const result = await res.json();
-            if (result.status !== 'success') return;
-            renderFutureTable(result.forecasts.slice(0, 200));
-            renderFutureChart(result.contexts, result.forecasts);
-            setTimeout(() => futureChart.resize(), 50);
+            try {
+                const res = await fetch(`/api/future_forecast?uid=${encodeURIComponent(uid)}&days=${encodeURIComponent(days)}`);
+                const result = await res.json();
+                if (result.status !== 'success') return;
+                
+                renderFutureForecastTable(result.forecasts.slice(0, 150));
+                renderFutureChart(result.contexts, result.forecasts);
+                
+                // Draw selected client on Future Forecast Leaflet Map
+                if (uid && uid !== 'all') {
+                    initFuturePatientMap();
+                    drawPatientCoordinatesOnMap(futurePatientMap, futureMarkers, uid);
+                } else if (result.contexts.length) {
+                    initFuturePatientMap();
+                    drawPatientCoordinatesOnMap(futurePatientMap, futureMarkers, result.contexts[0].client_id);
+                }
+            } catch (err) {
+                console.error(err);
+            }
         }
 
-        function renderFutureTable(rows) {
-            document.getElementById('futureTable').innerHTML = rows.map(row => `
-                <tr class="border-b border-slate-100 hover:bg-slate-50">
-                    <td class="font-semibold">${row.client_id}</td>
-                    <td>${formatDay(row.predicted_pharmacy_day)}</td>
-                    <td>${row.disease}</td>
-                    <td>${renderPills(row.predicted_meds)}</td>
-                    <td>${renderPills(row.recommended_products)}</td>
-                </tr>
-            `).join('');
+        function renderFutureForecastTable(rows) {
+            const table = document.getElementById('futureTable');
+            table.innerHTML = rows.map(row => {
+                // Future projections use forecast picker starting date offsets (days_later)
+                const predictedDate = dayToDate(row.days_later, true);
+                return `
+                    <tr class="hover:bg-slate-50 border-b border-slate-100">
+                        <td class="font-semibold text-slate-800 py-3">${row.client_id}</td>
+                        <td>
+                            <div>${predictedDate}</div>
+                            <div class="text-[10px] text-slate-400 font-mono">Day ${row.predicted_pharmacy_day} (${row.days_later}d後)</div>
+                        </td>
+                        <td class="text-slate-500 font-mono">± ${state.modelMae.toFixed(1)}d</td>
+                        <td>${renderPills(row.recommended_products)}</td>
+                    </tr>
+                `;
+            }).join('');
         }
 
         function renderFutureChart(contexts, forecasts) {
@@ -530,22 +2067,55 @@
                 futureChart.clear();
                 return;
             }
+            
             const context = contexts[0];
             const rows = forecasts.filter(row => row.client_id === context.client_id);
             const coverageStart = context.last_pharmacy_day;
             const coverageEnd = context.coverage_end_day;
             const forecastRows = rows.length ? rows.slice(0, 3) : [];
-            const xValues = [coverageStart, coverageEnd, ...forecastRows.map(row => row.predicted_pharmacy_day)];
-            const minDay = Math.min(...xValues) - 15;
-            const maxDay = Math.max(...xValues) + 30;
+            
             const firstForecast = forecastRows[0];
             const yLabels = {
-                4: '預測要帶商品',
-                3: '預測藥品',
-                2: '模型預測領藥',
-                1: '補藥基準點',
+                4: '預估推薦商品',
+                3: '預估處方用藥',
+                2: '預估回訪領藥',
+                1: '週期結束點',
                 0: '目前用藥週期'
             };
+            
+            // Future projections use forecast picker starting date offsets relative to base date
+            const coverageStartDate = dayToDate(0, true);
+            const coverageEndDate = dayToDate(context.last_m_days, true);
+            
+            const lineData = [[coverageStartDate, 0], [coverageEndDate, 0]];
+            const scatterBase = firstForecast ? [{
+                value: [coverageEndDate, 1],
+                name: `週期結束點 (${coverageEndDate})`,
+                meta: { meds: context.last_meds.join('|'), products: context.last_products.join('|') }
+            }] : [];
+            
+            const scatterVisits = forecastRows.map(row => ({
+                value: [dayToDate(row.days_later, true), 2],
+                name: `預估領藥 (${dayToDate(row.days_later, true)})`,
+                meta: { meds: row.predicted_meds, products: row.recommended_products, gap: row.predicted_gap }
+            }));
+            
+            const scatterMeds = forecastRows.map(row => ({
+                value: [dayToDate(row.days_later, true), 3],
+                name: '預估處方藥品',
+                meta: { meds: row.predicted_meds, products: row.recommended_products }
+            }));
+            
+            const scatterProducts = forecastRows.map(row => ({
+                value: [dayToDate(row.days_later, true), 4],
+                name: '預估智慧推薦商品',
+                meta: { meds: row.predicted_meds, products: row.recommended_products }
+            }));
+            
+            const maxDaysLater = forecastRows.length ? Math.max(...forecastRows.map(row => row.days_later)) : context.last_m_days;
+            const minAxisDate = dayToDate(-3, true);
+            const maxAxisDate = dayToDate(maxDaysLater + 10, true);
+
             futureChart.clear();
             futureChart.setOption({
                 tooltip: {
@@ -553,18 +2123,19 @@
                     formatter: params => {
                         const data = params.data || {};
                         if (data.meta) {
-                            return `${data.name}<br/>${formatDay(data.value[0])}<br/>Meds: ${data.meta.meds || ''}<br/>Products: ${data.meta.products || ''}`;
+                            return `${data.name}<br/>Meds: ${data.meta.meds || ''}<br/>Products: ${data.meta.products || ''}`;
                         }
                         return data.name || '';
                     }
                 },
-                grid: { left: 120, right: 24, top: 24, bottom: 56 },
+                grid: { left: 120, right: 30, top: 30, bottom: 56 },
                 xAxis: {
-                    type: 'value',
-                    name: 'month',
-                    min: Math.max(0, minDay),
-                    max: maxDay,
-                    axisLabel: { formatter: value => `M${(value / 30).toFixed(0)}` }
+                    type: 'time',
+                    name: 'Date',
+                    min: minAxisDate,
+                    max: maxAxisDate,
+                    axisLabel: { formatter: '{yyyy}-{MM}-{dd}', rotate: 30, hideOverlap: true },
+                    splitNumber: 6
                 },
                 yAxis: {
                     type: 'value',
@@ -578,74 +2149,76 @@
                     {
                         type: 'line',
                         name: '目前用藥週期',
-                        data: [[coverageStart, 0], [coverageEnd, 0]],
-                        lineStyle: { width: 12, color: '#d4d4d8', cap: 'round' },
+                        data: lineData,
+                        lineStyle: { width: 12, color: '#e2e8f0', cap: 'round' },
                         symbol: 'circle',
                         symbolSize: 10,
                         label: {
                             show: true,
                             position: 'top',
-                            formatter: params => params.dataIndex === 0 ? `Last refill\n${formatDay(coverageStart)}` : '',
+                            formatter: params => params.dataIndex === 0 ? `最近一次領藥\n(${coverageStartDate})` : '',
                             offset: [0, -10]
                         }
                     },
                     {
                         type: 'scatter',
-                        name: '補藥基準點',
+                        name: '週期結束點',
                         symbolSize: 18,
-                        data: firstForecast ? [{
-                            value: [coverageEnd, 1],
-                            name: `補藥基準點\n${formatDay(coverageEnd)}`,
-                            meta: { meds: context.last_meds.join('|'), products: context.last_products.join('|') }
-                        }] : [],
-                        itemStyle: { color: '#737373' },
-                        label: { show: true, position: 'right', formatter: '週期結束' }
+                        data: scatterBase,
+                        itemStyle: { color: '#64748b' },
+                        label: { show: true, position: 'right', formatter: '基礎用藥結束' }
                     },
                     {
                         type: 'scatter',
-                        name: '模型預測領藥',
+                        name: '預估回訪領藥',
                         symbolSize: 18,
-                        data: forecastRows.map(row => ({
-                            value: [row.predicted_pharmacy_day, 2],
-                            name: `預測領藥 (${formatDelta(row.predicted_gap)})`,
-                            meta: { meds: row.predicted_meds, products: row.recommended_products, gap: row.predicted_gap }
-                        })),
-                        itemStyle: { color: '#111827' },
+                        data: scatterVisits,
+                        itemStyle: { color: '#0f172a' },
                         label: {
                             show: true,
                             position: 'right',
-                            formatter: params => `${formatDay(params.value[0])}`,
+                            formatter: params => `${params.value[0]} (± ${state.modelMae.toFixed(1)}d)`,
                             offset: [8, 0]
                         }
                     },
                     {
                         type: 'scatter',
-                        name: '預測藥品',
+                        name: '預估處方用藥',
                         symbolSize: 14,
-                        data: forecastRows.map(row => ({
-                            value: [row.predicted_pharmacy_day, 3],
-                            name: '預測藥品',
-                            meta: { meds: row.predicted_meds, products: row.recommended_products }
-                        })),
+                        data: scatterMeds,
                         itemStyle: { color: '#475569' },
                         label: { show: true, position: 'right', formatter: params => params.data.meta.meds.replaceAll('|', '\n'), width: 160, overflow: 'break', fontSize: 10, lineHeight: 13, offset: [8, 0] }
                     },
                     {
                         type: 'scatter',
-                        name: '預測要帶商品',
+                        name: '預估智慧推薦商品',
                         symbolSize: 14,
-                        data: forecastRows.map(row => ({
-                            value: [row.predicted_pharmacy_day, 4],
-                            name: '預測要帶商品',
-                            meta: { meds: row.predicted_meds, products: row.recommended_products }
-                        })),
+                        data: scatterProducts,
                         itemStyle: { color: '#0f766e' },
                         label: { show: true, position: 'right', formatter: params => params.data.meta.products.replaceAll('|', '\n'), width: 170, overflow: 'break', fontSize: 10, lineHeight: 13, offset: [8, 0] }
                     }
                 ]
             });
         }
-        setUnlocked();
+
+        // On window resize
+        window.addEventListener('resize', () => {
+            visitChart.resize();
+            retailChart.resize();
+            futureChart.resize();
+            lossChart.resize();
+        });
+
+        // Initialize App on load
+        window.onload = async () => {
+            await loadDatabasesList();
+            if (state.activeDb) {
+                await checkDbStatus();
+                await loadDbRecords();
+                await loadModelsList();
+            }
+            showSection('db');
+        };
     </script>
 </body>
 </html>
