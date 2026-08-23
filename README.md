@@ -90,16 +90,13 @@ flowchart TD
 3. 或使用 **「上傳 CSV」** 匯入現有的慢性病領藥歷史紀錄，或將當前資料庫紀錄 **「匯出為 CSV」**。
 
 ### 階段 3：AI 模型訓練 (Model Training)
-在 **「模型訓練與設定」** 頁籤中，可選用以下 AI 預測模型進行訓練：
+在 **「模型訓練與設定」** 頁籤中，可選擇並訓練多種臨床用藥預測與零售推薦模型：
 
-1. **Baseline LSTM (帶有疾病遮罩的序列 LSTM)**：
-   - 學習個案歷史領藥序列，預測下次領藥間隔天數（`M_gap`）與預計開立的藥物組合。
-2. **CVAE (條件式變異自編碼器)**：
-   - 結合 Focal Loss 與多重採樣集成 (Ensemble Sampling)，適合應對藥物品項稀疏性與正負樣本不平衡。
-3. **Statistical Baseline (統計學基線)**：
-   - 採用多輸出邏輯迴歸 (Logistic Regression) + Ridge 自迴歸 (AR) 模型。
-4. **Product Recommender NN / Tabular DDPM (零售連帶推薦模型)**：
-   - 訓練基於神經網路或擴散模型的非處方商品（OTC/保健食品）推薦演算法。
+1. **CVAE (條件式變異自編碼器)**：結合 Focal Loss 與 10 次多重採樣集成 (Ensemble Sampling)，應對藥物品項稀疏性與正負樣本極度不平衡。
+2. **Baseline LSTM (帶有疾病遮罩的序列 LSTM)**：學習個案歷史領藥序列，預測下次領藥間隔天數（`M_gap`）與開立藥物組合。
+3. **Statistical Model (統計學模型)**：採用多輸出邏輯迴歸 (Logistic Regression) 與 Ridge 自迴歸 (AR) 模型。
+4. **Tabular DDPM (表格去噪擴散概率模型)**：非處方零售商品（OTC/保健食品）推薦模型，採用 50 步馬可夫加噪與條件去噪 MLP。
+5. **Product Recommender NN (零售推薦神經網路)**：雙層全連接推薦模型。
 
 點擊 **「開始訓練模型」**，後端即時輸出 Training Log 與訓練損失 (Loss) 變化。
 
@@ -122,18 +119,46 @@ flowchart TD
 
 ---
 
-## 核心 AI 模型架構說明
+## 🧠 AI 模型架構與數學定義說明
 
-| 模型名稱 | 檔案位置 | 演算法/技術細節 | 應用場景 |
-| :--- | :--- | :--- | :--- |
-| **Baseline LSTM** | [`module/model.py`](file:///c:/Users/ss348/Desktop/pharmacy_simulator/module/model.py) | LSTM + Disease Embedding + Disease Masking | 慢性病領藥天數與藥物組合預測 |
-| **CVAE Model** | [`module/model.py`](file:///c:/Users/ss348/Desktop/pharmacy_simulator/module/model.py) | Conditional VAE + Focal Loss + Skip Connection | 概率式多重採樣領藥預測 |
-| **Statistical Baseline** | [`module/model.py`](file:///c:/Users/ss348/Desktop/pharmacy_simulator/module/model.py) | MultiOutput Logistic Regression + Ridge AR | 傳統機器學習統計基線比對 |
-| **ProductRecommenderNN** | [`module/retail_pipeline.py`](file:///c:/Users/ss348/Desktop/pharmacy_simulator/module/retail_pipeline.py) | Multi-Layer Perceptron (MLP) | 年齡/疾病相干之 OTC 零售連帶推薦 |
-| **Tabular DDPM** | [`module/retail_pipeline.py`](file:///c:/Users/ss348/Desktop/pharmacy_simulator/module/retail_pipeline.py) | 表格去噪擴散概率模型 (Diffusion) | 高維度購物籃產生式推薦 |
+詳細模型數學推導、輸入輸出張量公式、損失函數與演算法定義，請參閱專屬文件：
+👉 **[MODEL_MATHEMATICAL_FORMULATION.md](file:///c:/Users/ss348/Desktop/pharmacy_simulator/MODEL_MATHEMATICAL_FORMULATION.md)**
+
+系統整合了深度產生式 AI (Generative AI)、序列神經網路與機器學習模組：
+
+### 1. 慢性病處方用藥與領藥天數預測模型
+
+1. **CVAE 條件式變異自編碼器 (Conditional VAE)**
+   - **檔案位置**：[`module/model.py`](file:///c:/Users/ss348/Desktop/pharmacy_simulator/module/model.py)
+   - **技術特點**：
+     - 引入 **Focal Loss**（$\alpha=0.25, \gamma=2$）克服處方藥物稀疏性與正負樣本極度不平衡問題。
+     - **時間記憶跳躍連接 (Temporal Skip Connection)**：將 LSTM 歷史序列記憶與潛在空間變數 $\mathbf{z}$ 融合，確保時間脈絡不遺失。
+     - **多重採樣集成 (Ensemble Sampling)**：推論時進行 10 次潛在空間隨機採樣求平均機率。
+
+2. **帶有疾病遮罩的序列 LSTM 模型 (Masked Sequence LSTM)**
+   - **檔案位置**：[`module/model.py`](file:///c:/Users/ss348/Desktop/pharmacy_simulator/module/model.py)
+   - **技術特點**：結合 LSTM 歷史領藥序列、Disease Embedding 疾病特徵與硬用藥遮罩 (Hard Disease Masking)，同步預測領藥天數與處方藥物。
+
+3. **統計學預測模型 (Statistical Model)**
+   - **檔案位置**：[`module/model.py`](file:///c:/Users/ss348/Desktop/pharmacy_simulator/module/model.py)
+   - **技術特點**：使用多輸出邏輯迴歸 (Multi-Output Logistic Regression) 預測處方藥物，搭配 Ridge 自迴歸 (AR) 模型預測領藥間隔天數。
+
+---
+
+### 2. 藥局 OTC / 保健食品零售連帶推薦模型
+
+1. **Tabular DDPM 表格去噪擴散概率模型 (Tabular Diffusion Model)**
+   - **檔案位置**：[`module/retail_pipeline.py`](file:///c:/Users/ss348/Desktop/pharmacy_simulator/module/retail_pipeline.py)
+   - **技術特點**：50 步高斯馬可夫鏈前向加噪與條件去噪 MLP 反向重建，結合顧客年齡與慢性疾病類別進行 **Context Embedding** 條件約束。
+
+2. **零售推薦前饋神經網路 (ProductRecommenderNN)**
+   - **檔案位置**：[`module/retail_pipeline.py`](file:///c:/Users/ss348/Desktop/pharmacy_simulator/module/retail_pipeline.py)
+   - **技術特點**：雙層全連接神經網路 (MLP)，輸入年齡與慢性病用藥向量，輸出 10 大零售商品推薦機率。
 
 ---
 
 ## 📄 授權條款 (License)
 
 本專案供學術研究與藥局照護模擬使用。
+
+
